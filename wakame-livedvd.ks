@@ -37,15 +37,15 @@ livecd-tools
 sudo
 bridge-utils
 
-#wakame-vdc-example-1box-full-vmapp-config
-wakame-vdc-example-1box-dcmgr-vmapp-config
-wakame-vdc-example-1box-proxy-vmapp-config
-wakame-vdc-example-1box-webui-vmapp-config
-wakame-vdc-example-1box-nsa-vmapp-config
-wakame-vdc-example-1box-sta-vmapp-config
-#wakame-vdc-example-1box-hva-vmapp-config
-wakame-vdc-example-1box-admin-vmapp-config
-wakame-vdc-hva-kvm-vmapp-config
+##wakame-vdc-example-1box-full-vmapp-config
+#wakame-vdc-example-1box-dcmgr-vmapp-config
+#wakame-vdc-example-1box-proxy-vmapp-config
+#wakame-vdc-example-1box-webui-vmapp-config
+#wakame-vdc-example-1box-nsa-vmapp-config
+#wakame-vdc-example-1box-sta-vmapp-config
+##wakame-vdc-example-1box-hva-vmapp-config
+#wakame-vdc-example-1box-admin-vmapp-config
+#wakame-vdc-hva-kvm-vmapp-config
 
 %post
 
@@ -54,8 +54,19 @@ LIVE_USER="wakame"
 cat > /root/post-install << EOF_post
 #!/bin/bash
 
-yum install --disablerepo=updates -y http://dlc.openvnet.axsh.jp/packages/rhel/openvswitch/6/kmod-openvswitch-2.3.0-1.el6.x86_64.rpm
-yum install --disablerepo=updates -y http://dlc.openvnet.axsh.jp/packages/rhel/openvswitch/6/openvswitch-2.3.0-1.x86_64.rpm
+yum install --disablerepo=updates -y http://dlc.openvnet.axsh.jp/packages/rhel/openvswitch/6.5/kmod-openvswitch-2.3.0-1.el6.x86_64.rpm
+yum install --disablerepo=updates -y http://dlc.openvnet.axsh.jp/packages/rhel/openvswitch/6.5/openvswitch-2.3.0-1.x86_64.rpm
+
+#wakame-vdc-example-1box-full-vmapp-config
+yum install wakame-vdc-example-1box-dcmgr-vmapp-config
+yum install wakame-vdc-example-1box-proxy-vmapp-config
+yum install wakame-vdc-example-1box-webui-vmapp-config
+yum install wakame-vdc-example-1box-nsa-vmapp-config
+yum install wakame-vdc-example-1box-sta-vmapp-config
+#wakame-vdc-example-1box-hva-vmapp-config
+yum install wakame-vdc-example-1box-admin-vmapp-config
+yum install wakame-vdc-hva-kvm-vmapp-config
+
 
 # set the LiveMedia hostname
 sed -i -e 's/HOSTNAME=localhost.localdomain/HOSTNAME=wakame-vdc.live.example.com/g' /etc/sysconfig/network
