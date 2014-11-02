@@ -36,6 +36,10 @@ dhclient
 livecd-tools
 sudo
 bridge-utils
+openssh
+openssh-clients
+openssh-server
+
 
 ##wakame-vdc-example-1box-full-vmapp-config
 #wakame-vdc-example-1box-dcmgr-vmapp-config
@@ -66,6 +70,8 @@ yum install wakame-vdc-example-1box-sta-vmapp-config
 #wakame-vdc-example-1box-hva-vmapp-config
 yum install wakame-vdc-example-1box-admin-vmapp-config
 yum install wakame-vdc-hva-kvm-vmapp-config
+
+yum downgrade -y http://dlc.wakame.axsh.jp/packages/3rd/rhel/6/master/wakame-vdc-ruby-2.0.0.247.axsh0-1.x86_64.rpm
 
 
 # set the LiveMedia hostname
