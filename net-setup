@@ -12,8 +12,8 @@ GATEWAY=$3
 sed -i -e "s/^IPADDR=.*$/IPADDR=$IPADDR/" /etc/sysconfig/network-scripts/ifcfg-br0
 sed -i -e "s/^NETMASK=.*$/NETMASK=$NETMASK/" /etc/sysconfig/network-scripts/ifcfg-br0
 sed -i -e "s/^GATEWAY=.*$/GATEWAY=$GATEWAY/" /etc/sysconfig/network-scripts/ifcfg-br0
-sed -i -e "s/^ONBOOT=.*$/ONBOOT=yes$/" /etc/sysconfig/network-scripts/ifcfg-br0
-sed -i -e "s/^ONBOOT=.*$/ONBOOT=yes$/" /etc/sysconfig/network-scripts/ifcfg-eth0
+sed -i -e "s/^ONBOOT=.*$/ONBOOT=yes/" /etc/sysconfig/network-scripts/ifcfg-br0
+sed -i -e "s/^ONBOOT=.*$/ONBOOT=yes/" /etc/sysconfig/network-scripts/ifcfg-eth0
 
 /etc/init.d/network restart
 
