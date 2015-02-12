@@ -1,0 +1,547 @@
+#!/opt/axsh/wakame-vdc/ruby/bin/ruby
+
+require 'pp'
+require 'fileutils'
+
+module WakeWakameVdc
+   module UI
+      class Zenity
+         #require 'zenity'
+      end
+   
+      class Dialog
+         require 'rdialog'
+   
+         def initialize
+            @dialog = RDialog.new
+         end
+
+         def escape?
+            constants = WakeWakameVdc::Constants.new
+            yesno(constants.messages[:escape])
+         end
+   
+         def radiolist(msg, columns: nil, rows: nil, escape: false)
+            result = @dialog.radiolist(msg, rows)
+            if escape
+               exit if escape?
+               result = radiolist(msg, columns, rows, escape)
+            end unless result
+            return result
+         end
+   
+         def inputbox(msg, escape: false)
+            result = @dialog.inputbox(msg)
+            if escape
+               exit if escape?
+               result = inputbox(msg, escape)
+            end unless result
+            return result
+         end
+   
+         def msgbox(msg, escape: false)
+            result = @dialog.msgbox(msg)
+            if escape
+               exit if escape?
+               result = msgbox(msg, escape)
+            end unless result
+            return result
+         end
+   
+         def yesno(msg, escape: false)
+            result = @dialog.yesno(msg)
+            if escape
+               exit if escape?
+               result = yesno(msg, escape)
+            end unless result
+            return result
+         end
+   
+      end
+   end
+
+   class Config
+      def initialize(host: '127.0.0.1', port: 4001)
+         require 'etcd'
+         @etcd = Etcd.client(host: host, port: port)
+      end
+
+      def [](category, param)
+         begin
+            result = @etcd.get("/#{category.to_s}/#{param.to_s}").value
+         rescue Etcd::KeyNotFound => e
+            result = []
+         end
+         return result
+      end
+
+      def []=(category, param, value)
+         @etcd.set("/#{category.to_s}/#{param.to_s}", value: value)
+      end
+
+      def retrieve_hva_hosts()
+         begin
+            result = @etcd.get('hva/hosts', recursive: true).value
+         rescue Etcd::KeyNotFound => e
+            result = []
+         end
+         return result
+      end
+
+   end
+
+   class Networking
+      def initialize(distro: 'centos')
+         # distro are 'centos', 'ubuntu', 'gentoo'
+         (self.methods - WakeWakameVdc::Networking.methods).each do |method_list|
+            if /.*_#{distro}$/ =~ method_list
+               eval "alias #{method_list.to_s.sub(/_#{distro}$/, '')} #{method_list}"
+            end
+         end
+         @config = WakeWakameVdc::Config.new
+         @constants = WakeWakameVdc::Constants.new
+      end
+
+      def list_linked_interfaces_centos
+         linked_interfaces = []
+         nics = `/sbin/ip a | /bin/grep "^[0-9]*:" | /bin/awk '{print $2}' | /usr/bin/tr -d ':' | /bin/grep -v ^lo`
+         nics.split("\n").each do |nic|
+            linked_interfaces << nic.chomp if 1 == `/sbin/ethtool #{nic} | /bin/grep "Link detected: yes" | /usr/bin/wc -l`.chomp.to_i
+         end
+         return linked_interfaces
+      end
+
+      def list_ip_addresses_centos
+         ip_addresses = []
+         list_linked_interfaces.each do |nic|
+            result = `/sbin/ip -f inet addr show dev #{nic} | grep inet | awk '{print $2}'`
+            result.split("\n").each do |segment|
+               ip, prefix = segment.split('/')
+               ip_addresses << {:ip => ip, :prefix => prefix}
+            end
+         end
+         return ip_addresses
+      end
+
+      def make_network_interface_centos(ip: '169.254.1.1', nm: '255.255.255.255', gw: nil, device: 'eth0', dhcp: false, ether_type: 'Ethernet')
+         File.open("#{@constants.network_conf}ifcfg-#{device}", 'w') do |file|
+            file.puts(<<"EOF")
+DEVICE="#{device}"
+NM_CONTROLLED="no"
+ONBOOT="yes"
+TYPE="#{ether_type}"
+EOF
+            if dhcp
+               file.puts "BOOTPROTO=\"dhcp\""
+            else
+               file.puts(<<"EOF")
+BOOTPROTO="static"
+IPADDR="#{ip}"
+NETMASK="#{nm}"
+EOF
+            end
+            file.puts "GATEWAY=\"#{gw}\"" if gw
+         end
+      end
+
+      def make_bridge_and_attach_physical_interface_centos(ip: '169.254.1.1', nm: '255.255.255.255', gw: nil, physical: 'eth0', bridge: 'br0')
+         File.open("#{@constants.network_conf}ifcfg-#{bridge}", 'w') do |file|
+            file.puts(<<"EOF")
+DEVICE="#{bridge}"
+BOOTPROTO="static"
+NM_CONTROLLED="no"
+ONBOOT="yes"
+TYPE="Bridge"
+IPADDR="#{ip}"
+NETMASK="#{nm}"
+EOF
+            file.puts "GATEWAY=\"#{gw}\"" if gw
+         end
+         File.open("#{@constants.network_conf}ifcfg-#{physical}", 'w') do |file|
+            file.puts(<<"EOF")
+DEVICE="#{physical}"
+ONBOOT="yes"
+BRIDGE="#{bridge}"
+NM_CONTROLLED="no"
+EOF
+         end
+      end
+
+      def guess_unused_segment
+         #FIXME
+         cidrs = {
+            :a => {:ip => '10.0.0.1', :prefix => 8, 
+                  :nm => '255.0.0.0', :nw => '10.0.0.0', 
+                  :vm_dhcp_min => '10.0.0.10', :vm_dhcp_max => '10.0.0.200',
+            },
+            :b => {:ip => '172.16.0.1', :prefix => 12,
+                  :nm => '255.240.0.0', :nw => '172.16.0.0',
+                  :vm_dhcp_min => '172.16.0.10', :vm_dhcp_max => '172.16.0.200',
+            },
+            :c => {:ip => '192.168.0.1', :prefix => 16,
+                  :nm => '255.255.0.0', :nw => '192.168.0.0',
+                  :vm_dhcp_min => '192.168.0.10', :vm_dhcp_max => '192.168.0.200',
+            }
+         }
+         list_ip_addresses.each do |segment|
+            case segment[:ip]
+            when /^10\./
+               cidrs.delete(:a)
+            when /^172\.16\./
+               cidrs.delete(:b)
+            when /^192\.168\./
+               cidrs.delete(:c)
+            end
+         end
+         return cidrs.to_a[0][1]
+      end
+
+      def network_restart_centos
+         `/etc/init.d/network restart`
+         `/etc/init.d/sshd restart`
+      end
+
+      def boot_dnsmasq_centos
+         result = `/usr/sbin/dnsmasq --dhcp-range=#{@config[:hva, :dhcp_min]},#{@config[:hva, :dhcp_max]} --dhcp-boot=pxelinux.0 --enable-tftp --tftp-root=/tftpboot --interface=br0`
+      end
+
+      def terminate_dnsmasq_centos
+         if FileTest.exist?(@constants.dnsmasq_pid)
+            dialog.msgbox(@constants.messages[:confirm_terminate_dnsmasq]) if yesno
+            dialog.msgbox(@constants.messages[:reconfirm_terminate_dnsmasq]) if yesno
+            pid = File.open(@constants.dnsmasq_pid, 'r').read.chomp
+            `/bin/kill -SIGTERM #{pid}`
+            `rm -f #{@constants.dnsmasq_pid}`
+         end
+      end
+
+      def create_pxe_cfg_centos
+         pxe_cfg = <<-"EOF"
+default pxeboot
+menu background splash.jpg
+menu vshift 10
+menu width 80
+timeout 10
+menu title Wakame-VDC LiveDVD
+label pxeboot
+	menu label Wakame-VDC HVA
+	kernel iso/isolinux/vmlinuz0
+	append initrd=iso/isolinux/initrd0.img fetch=tftp://#{@config[:dcmgr, :host_ip]}/iso/LiveOS/squashfs.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ip=dhcp ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001
+onerror localboot -1
+         EOF
+         File.open("/tftpboot/pxelinux.cfg/default", 'w') do |file|
+            file.puts pxe_cfg
+         end
+      end
+
+      def subnetcalc(ip: '127.0.0.1', nm: '255.255.255.0')
+         `subnetcalc #{ip} #{nm} -n`.each_line do |line|
+            if /^Network / =~ line
+               nw_address, nw_prefix = line.chomp.split("=")[1].split("/")
+               nw_address.strip!
+               nw_prefix.strip!
+               break
+            end
+         end
+         return {:nw_address => nw_address, :nw_prefix => nw_prefix}
+      end
+   end
+
+   class WakeUp
+      def initialize(distro: 'centos')
+         # distro are 'centos', 'ubuntu', 'gentoo'
+         (self.methods - WakeWakameVdc::WakeUp.methods).each do |method_list|
+            if /.*_#{distro}$/ =~ method_list
+               eval "alias #{method_list.to_s.sub(/_#{distro}$/, '')} #{method_list}"
+            end
+         end
+         #@config = WakeWakameVdc::Config.new
+         #@constants = WakeWakameVdc::Constants.new
+      end
+
+      def start_rabbitmq_centos
+         result = `/sbin/service rabbitmq-server start`
+         case result
+         when "Starting rabbitmq-server: RabbitMQ is currently running\nrabbitmq-server.\n"
+            return true
+         when "Starting rabbitmq-server: SUCCESS\nrabbitmq-server.\n"
+            return true
+         else
+            return false
+         end
+         #"Stopping rabbitmq-server: rabbitmq-server.\n"
+      end
+
+      def start_mysql_centos
+         result = `/sbin/service mysqld start`
+         case result
+         when "Starting mysqld:  \e[60G[\e[0;32m  OK  \e[0;39m]\r\n"
+            return true
+         else
+            return false
+         end
+      end
+
+      def start_vdc_dcmgr_centos
+         result = `/sbin/start vdc-dcmgr`
+         case result.chomp
+         when /^vdc-dcmgr start\/running, process [0-9]*$/
+            return true
+         else
+            return false
+         end
+      end
+
+      def start_vdc_collector_centos
+         result = `/sbin/start vdc-collector`
+         case result.chomp
+         when /^vdc-collector start\/running, process [0-9]*$/
+            return true
+         else
+            return false
+         end
+      end
+
+      def start_vdc_hva_centos
+         result = `/sbin/start vdc-hva`
+         case result.chomp
+         when /^vdc-hva start\/running, process [0-9]*$/
+            return true
+         else
+            return false
+         end
+      end
+
+      def start_vdc_webui_centos
+         #FIXME
+         result = `/sbin/start vdc-webui`
+         if "" == result.chomp
+            result = `/sbin/status vdc-webui`
+            if "vdc-webui stop/waiting" == result.chomp
+               return start_vdc_webui
+            end
+         elsif /^vdc-webui start\/running, process [0-9]*$/ =~ result.chomp
+            return true
+         else
+            return false
+         end
+      end
+
+      def add_hva(node_id, hypervisor: 'kvm')
+         cmd =<<"EOF"
+/opt/axsh/wakame-vdc/dcmgr/bin/vdc-manage host add hva.#{node_id}
+--uuid hn-#{node_id} --display-name "hva #{node_id}"
+--cpu-cores 100 --memory-size 10240 --hypervisor #{hypervisor}
+--arch x86_64 --disk-space 102400 --force
+EOF
+         result = `#{cmd}`
+      end
+
+      def copy_vdc_config
+         FileUtils.copy '/opt/axsh/wakame-vdc/dcmgr/config/dcmgr.conf.example' '/etc/wakame-vdc/dcmgr.conf'
+         FileUtils.copy '/opt/axsh/wakame-vdc/dcmgr/config/hva.conf.example' '/etc/wakame-vdc/hva.conf'
+         FileUtils.copy '/opt/axsh/wakame-vdc/frontend/dcmgr_gui/config/database.yml.example' '/etc/wakame-vdc/dcmgr_gui/database.yml'
+         FileUtils.copy '/opt/axsh/wakame-vdc/frontend/dcmgr_gui/config/dcmgr_gui.yml.example' '/etc/wakame-vdc/dcmgr_gui/dcmgr_gui.yml'
+         FileUtils.copy '/opt/axsh/wakame-vdc/frontend/dcmgr_gui/config/instance_spec.yml.example' '/etc/wakame-vdc/dcmgr_gui/instance_spec.yml'
+         FileUtils.copy '/opt/axsh/wakame-vdc/frontend/dcmgr_gui/config/load_balancer_spec.yml.example' '/etc/wakame-vdc/dcmgr_gui/load_balancer_spec.yml'
+         FileUtils.copy '/opt/axsh/wakame-vdc/dcmgr/config/sta.conf.example' '/etc/wakame-vdc/sta.conf'
+         FileUtils.copy '/opt/axsh/wakame-vdc/dcmgr/config/nsa.conf.example' '/etc/wakame-vdc/nsa.conf'
+         FileUtils.copy '/opt/axsh/wakame-vdc/dcmgr/config/snapshot_repository.yml.example' '/etc/wakame-vdc/snapshot_repository.yml'
+# sudo cp /opt/axsh/wakame-vdc/dcmgr/config/nwmongw.conf.example /etc/wakame-vdc/nwmongw.conf
+# # sudo cp /opt/axsh/wakame-vdc/dcmgr/config/hma.conf.example /etc/wakame-vdc/hma.conf
+# # sudo cp /opt/axsh/wakame-vdc/dcmgr/config/bksta.conf.example /etc/wakame-vdc/bksta.conf
+# # sudo cp /opt/axsh/wakame-vdc/dcmgr/config/natbox.conf.example /etc/wakame-vdc/natbox.conf
+#
+      end
+
+   end
+
+   class Constants
+      attr_reader :messages, :structures, :hypervisors
+      attr_reader :network_conf, :pxe_cfg, :dnsmasq_pid
+      def initialize(lang: 'en', distro: 'centos')
+         case lang
+         when 'en'
+            @messages = {
+               :structure => 'Please select structure of Wakame-VDC',
+               :structure_type1 => 'All in one',
+               :structure_type2 => 'A controller and some nodes',
+               :hypervisor => 'What would you like to use as Hypervisor?',
+               :hypervisor_kvm => 'Linux Kernel Virtual Machine',
+               :hypervisor_lxc => 'Linux Containers (does not work in this LiveDVD)',
+               :hypervisor_openvz => 'OpenVZ (does not work in this LiveDVD)',
+               :host_ip => 'Please enter an IP address for ',
+               :host_nm => 'Please enter a Network Mask for ',
+               :host_gw => 'Please enter a Gateway for ',
+               :hva_dhcp_min => 'Please enter a start address of DHCP range for HVA nodes',
+               :hva_dhcp_max => 'Please enter an end address of DHCP range for HVA nodes',
+               :vm_dhcp_min => 'Please enter a start address of DHCP range for Instances',
+               :vm_dhcp_max => 'Please enter an end address of DHCP range for Instances',
+               :poweron => 'Please turning on the power of your HVA hosts and then wait a few minutes.',
+               :hva_confirm => "That's it?",
+               :escape => 'Exit and lose any changes?',
+               :confirm_terminate_dnsmasq => "If each node finished booting, please push <OK>.",
+               :reconfirm_terminate_dnsmasq => "Will kill dnsmasq process.",
+            }
+            @structures = [
+               ["Type 1", @messages[:structure_type1], true],
+               ["Type 2", @messages[:structure_type2], false],
+            ]
+            @hypervisors = [
+               ["KVM", @messages[:hypervisor_kvm], true],
+               ["LXC", @messages[:hypervisor_lxc], false],
+               ["OpenVZ", @messages[:hypervisor_openvz], false],
+            ]
+         end
+         case distro
+         when 'centos'
+            @network_conf = '/etc/sysconfig/network-scripts/'
+            @pxe_cfg = '/tftpboot/pxelinux.cfg/default'
+            @dnsmasq_pid = '/var/run/dnsmasq.pid'
+         end
+      end
+   end
+
+end
+
+def auto_1box
+   result = false
+   nic = @network.list_linked_interfaces[0]
+   nic = 'eth0' unless nic
+   @network.make_network_interface(device: nic, dhcp: true)
+   @network.network_restart
+   if 0 < @network.list_ip_addresses.size
+      @inner_net = @network.guess_unused_segment
+      @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'br0', ether_type: 'Bridge')
+      @network.network_restart
+      result = true
+   end
+   return result
+end
+
+def manual_1box
+   @config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
+   @config[:global, :hypervisor] = @dialog.radiolist(@constants.messages[:hypervisor], rows: @constants.hypervisors, escape: true)
+   @config[:dcmgr, :host_ip] = @dialog.inputbox(@constants.messages[:host_ip], escape: true)
+   @config[:dcmgr, :host_nm] = @dialog.inputbox(@constants.messages[:host_nm], escape: true)
+   @config[:dcmgr, :host_gw] = @dialog.inputbox(@constants.messages[:host_gw], escape: true)
+   @config[:vm, :dhcp_min] = @dialog.inputbox(@constants.messages[:vm_dhcp_min], escape: true)
+   @config[:vm, :dhcp_max] = @dialog.inputbox(@constants.messages[:vm_dhcp_max], escape: true)
+   
+   confirm = <<"EOL"
+Structure: #{@config[:global, :structure]}
+Hypervisor: #{@config[:global, :hypervisor]}
+eth0's IP address: #{@config[:dcmgr, :host_ip]}
+eth0's Subnet Mask: #{@config[:dcmgr, :host_nm]}
+eth0's Gateway address: #{@config[:dcmgr, :host_gw]}
+dhcp range for Instances: #{@config[:vm, :dhcp_min]} - #{@config[:vm, :dhcp_max]}
+EOL
+   @dialog.msgbox(confirm, escape: true)
+   nic = network.list_linked_interfaces[0]
+   @network.make_network_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], device: nic, ether_type: 'Ethernet')
+   @inner_net = @network.guess_unused_segment
+   @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'br0', ether_type: 'Bridge')
+   @network.network_restart
+   result = true
+end
+
+
+@dialog = WakeWakameVdc::UI::Dialog.new
+@constants = WakeWakameVdc::Constants.new
+@config = WakeWakameVdc::Config.new
+@network = WakeWakameVdc::Networking.new
+@wakeup = WakeWakameVdc::WakeUp.new
+@inner_net = nil
+
+#result = auto_1box if :auto_1box == mode
+#result = manual_1box if  :manual_1box == mode or false == result
+manual_1box unless auto_1box
+
+#nw = network.subnetcalc(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm])
+puts "-------------------- setup_wakame-vdc.sh -------------------"
+result = `IP="#{@inner_net[:ip]}" \
+ NETWORK="#{@inner_net[:nw]}" \
+ PREFIX="#{@inner_net[:prefix]}" \
+ DHCP_RANGE_START="#{@inner_net[:vm_dhcp_min]}" \
+ DHCP_RANGE_END="#{@inner_net[:vm_dhcp_max]}" \
+ /usr/local/bin/setup_wakame-vdc.sh`
+
+pp result
+
+puts "-------------------- setup_wakame-vdc.hva.sh -------------------"
+result = `/usr/local/bin/setup_wakame-vdc.hva.sh`
+pp result
+
+sleep 10
+
+@config.retrieve_hva_hosts.each do |hva|
+   @wakeup.add_hva(hva)
+end
+
+@wakeup.start_rabbitmq
+@wakeup.start_mysql
+@wakeup.start_vdc_dcmgr
+@wakeup.start_vdc_collector
+@wakeup.start_vdc_hva
+sleep 5
+@wakeup.start_vdc_webui
+
+=begin
+config[:global, :structure] = dialog.radiolist(constants.messages[:structure], rows: constants.structures, escape: true)
+config[:global, :hypervisor] = dialog.radiolist(constants.messages[:hypervisor], rows: constants.hypervisors, escape: true)
+config[:dcmgr, :host_ip] = dialog.inputbox(constants.messages[:host_ip], escape: true)
+config[:dcmgr, :host_nm] = dialog.inputbox(constants.messages[:host_nm], escape: true)
+config[:dcmgr, :host_gw] = dialog.inputbox(constants.messages[:host_gw], escape: true)
+config[:vm, :dhcp_min] = dialog.inputbox(constants.messages[:vm_dhcp_min], escape: true)
+config[:vm, :dhcp_max] = dialog.inputbox(constants.messages[:vm_dhcp_max], escape: true)
+
+confirm = <<"EOL"
+Structure: #{config[:global, :structure]}
+Hypervisor: #{config[:global, :hypervisor]}
+eth0's IP address: #{config[:dcmgr, :host_ip]}
+eth0's Subnet Mask: #{config[:dcmgr, :host_nm]}
+eth0's Gateway address: #{config[:dcmgr, :host_gw]}
+dhcp range for Instances: #{config[:vm, :dhcp_min]} - #{config[:vm, :dhcp_max]}
+EOL
+
+if 'Type 2' == config[:global, :structure]
+   config[:hva, :dhcp_min] = dialog.inputbox(constants.messages[:hva_dhcp_min], escape: true)
+   config[:hva, :dhcp_max] = dialog.inputbox(constants.messages[:hva_dhcp_max], escape: true)
+   confirm += <<-"EOL"
+dhcp range for HVA nodes: #{config[:hva, :dhcp_min]} - #{config[:hva, :dhcp_max]}
+   EOL
+end
+
+dialog.msgbox(confirm, escape: true)
+
+network.make_bridge(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm], gw: config[:dcmgr, :host_gw])
+network.network_restart
+
+if 'Type 2' == config[:global, :structure]
+   network.create_pxe_cfg
+   network.boot_dnsmasq
+   yesno = false
+   until yesno do
+      dialog.msgbox(constants.messages[:poweron])
+      hva_hosts = config.retrieve_hva_hosts
+      next unless hva_hosts
+      hva_hosts_list = hva_hosts.join("\n")
+      #hva_hosts.each do |hva_host|
+      # value into array
+      #end
+      dialog.msgbox(constants.messages[:hva_hosts] + "\n" + hva_hosts_list, escape: true)
+      yesno = dialog.msgbox(constants.messages[:hva_confirm])
+   end
+   exit unless yesno
+end
+
+network.terminate_dnsmasq
+
+case config[:global, :hypervisor]
+when 'LXC'
+   `/bin/sed -i -e "s/hypervisor kvm/hypervisor lxc/" /usr/local/bin/setup_wakame-vdc.sh`
+when 'OpenVZ'
+   `/bin/sed -i -e "s/hypervisor kvm/hypervisor openvz/" /usr/local/bin/setup_wakame-vdc.sh`
+end
+
+=end
