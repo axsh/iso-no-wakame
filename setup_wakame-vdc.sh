@@ -137,6 +137,7 @@ grep -v '\s*#' <<CMDSET | /opt/axsh/wakame-vdc/dcmgr/bin/vdc-manage -e
   network add \
     --uuid nw-demo1 \
     --ipv4-network "${NETWORK}" \
+    --ipv4-gw "${IP}" \
     --prefix "${PREFIX}" \
     --dns 8.8.8.8 \
     --account-id a-shpoolxx \

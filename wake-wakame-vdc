@@ -80,12 +80,15 @@ module WakeWakameVdc
       end
 
       def retrieve_hva_hosts()
+         hosts = []
          begin
-            result = @etcd.get('hva/hosts', recursive: true).value
+            @etcd.get('/hva/hosts').node.children.each do |node|
+               hosts << node.key.sub(%r|^/hva/hosts/|, '')
+            end
          rescue Etcd::KeyNotFound => e
-            result = []
+            hosts = []
          end
-         return result
+         return hosts
       end
 
    end
@@ -329,9 +332,9 @@ onerror localboot -1
 
       def add_hva(node_id, hypervisor: 'kvm')
          cmd =<<"EOF"
-/opt/axsh/wakame-vdc/dcmgr/bin/vdc-manage host add hva.#{node_id}
---uuid hn-#{node_id} --display-name "hva #{node_id}"
---cpu-cores 100 --memory-size 10240 --hypervisor #{hypervisor}
+/opt/axsh/wakame-vdc/dcmgr/bin/vdc-manage host add hva.#{node_id} \
+--uuid hn-#{node_id} --display-name "hva #{node_id}" \
+--cpu-cores 100 --memory-size 10240 --hypervisor #{hypervisor} \
 --arch x86_64 --disk-space 102400 --force
 EOF
          result = `#{cmd}`
@@ -472,7 +475,7 @@ puts "-------------------- setup_wakame-vdc.hva.sh -------------------"
 result = `/usr/local/bin/setup_wakame-vdc.hva.sh`
 pp result
 
-sleep 10
+sleep 5
 
 @config.retrieve_hva_hosts.each do |hva|
    @wakeup.add_hva(hva)

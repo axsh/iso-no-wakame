@@ -64,6 +64,8 @@ wakame-vdc-webui-vmapp-config
 
 %post
 
+cp -a /etc/resolv.conf /etc/resolv.conf.orig
+echo "nameserver 192.168.122.1" >> /etc/resolv.conf
 echo "Wakame-VDC LiveDVD release 15.02 (Final)" > /etc/redhat-release
 
 LIVE_USER="wakame"
@@ -84,6 +86,10 @@ sed -i -e "s/^Defaults    requiretty/#Defaults    requiretty/" /etc/sudoers
 echo "$LIVE_USER     ALL=(ALL)     NOPASSWD: ALL" >> /etc/sudoers
 /bin/sed -i -e "s|^\(exec /sbin/mingetty \)\(.*\)|\1 --autologin $LIVE_USER \2|" /etc/init/tty.conf
 
+/opt/axsh/wakame-vdc/ruby/bin/gem install etcd
+/opt/axsh/wakame-vdc/ruby/bin/gem install mixlib-log
+/opt/axsh/wakame-vdc/ruby/bin/gem install rdialog
+
 EOF_post
 
 /bin/bash -x /root/post-install 2>&1 | tee /root/post-install.log
@@ -97,7 +103,7 @@ cat > /root/postnochroot-install << EOF_postnochroot
 #!/bin/bash
 
 cp -r ./rpms ${INSTALL_ROOT}/tmp/
-#/usr/sbin/chroot ${INSTALL_ROOT}/ /bin/rpm -Uvh --nodeps --force /tmp/rpms/kmod-openvswitch-2.3.0-1.el6.x86_64.rpm /tmp/rpms/openvswitch-2.3.0-1.x86_64.rpm
+/usr/sbin/chroot ${INSTALL_ROOT}/ /bin/rpm -Uvh --nodeps --force /tmp/rpms/kmod-openvswitch-2.3.0-1.el6.x86_64.rpm /tmp/rpms/openvswitch-2.3.0-1.x86_64.rpm
 /usr/sbin/chroot ${INSTALL_ROOT}/ /bin/rpm -Uvh --nodeps --force /tmp/rpms/plymouth-0.8.3-27.el6.1.x86_64.rpm /tmp/rpms/plymouth-core-libs-0.8.3-27.el6.1.x86_64.rpm
 
 cp -a ./setup_wakame-vdc.sh ${INSTALL_ROOT}/usr/local/bin/
@@ -129,24 +135,19 @@ cp ${INSTALL_ROOT}/usr/share/syslinux/pxelinux.0 ${INSTALL_ROOT}/tftpboot/
 echo "RABBITMQ_NODE_IP_ADDRESS=0.0.0.0" >> ${INSTALL_ROOT}/etc/rabbitmq/rabbitmq-env.conf
 cp etcd ${INSTALL_ROOT}/usr/local/bin/
 cp etcdctl ${INSTALL_ROOT}/usr/local/bin/
+cp stone ${INSTALL_ROOT}/usr/local/bin/
 chmod +x ${INSTALL_ROOT}/usr/local/bin/etcd
 chmod +x ${INSTALL_ROOT}/usr/local/bin/etcdctl
+chmod +x ${INSTALL_ROOT}/usr/local/bin/stone
 cat >> ${INSTALL_ROOT}/etc/rc.local << EOF_rclocal
 [[ `grep etcd_host /proc/cmdline | wc -l` -eq 0 ]] && sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
 sudo /usr/local/bin/etcd -listen-client-urls=http://0.0.0.0:4001 -listen-peer-urls=http://0.0.0.0:7001 > /var/log/etcd.log 2>&1 &
-#sudo /usr/local/bin/wake-wakame-vdc >> /var/log/wakame-vdc.livedvd.log 2>&1
-#sudo /usr/local/bin/setup_wakame-vdc.hva.sh >> /var/log/wakame-vdc.livedvd.log 2>&1
-#sudo /sbin/service rabbitmq-server start >> /var/log/wakame-vdc.livedvd.log 2>&1
-#sudo /sbin/service mysqld start >> /var/log/wakame-vdc.livedvd.log 2>&1
-#sudo /sbin/start vdc-dcmgr >> /var/log/wakame-vdc.livedvd.log 2>&1
-#sudo /sbin/start vdc-collector >> /var/log/wakame-vdc.livedvd.log 2>&1
-#sudo /sbin/start vdc-hva >> /var/log/wakame-vdc.livedvd.log 2>&1
-#sudo /sbin/start vdc-webui >> /var/log/wakame-vdc.livedvd.log 2>&1
+sudo /usr/local/bin/wake-wakame-vdc >> /var/log/wakame-vdc.livedvd.log 2>&1
 EOF_rclocal
 
-cp -a ./gems/gems/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/gems/
-cp -a ./gems/specifications/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/specifications/
-cp -a ./gems/cache/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/cache/
+#cp -a ./gems/gems/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/gems/
+#cp -a ./gems/specifications/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/specifications/
+#cp -a ./gems/cache/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/cache/
 
 mkdir -p ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data
 cp -a ./sg-demofgr.rule ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
@@ -155,6 +156,7 @@ chmod 400 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/pri.pem
 cp -a ./pub.pem ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 chmod 400 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/pub.pem
 
+mv ${INSTALL_ROOT}/etc/resolv.conf.orig ${INSTALL_ROOT}/etc/resolv.conf
 EOF_postnochroot
 
 /bin/bash -x /root/postnochroot-install 2>&1 | tee /root/postnochroot-install.log

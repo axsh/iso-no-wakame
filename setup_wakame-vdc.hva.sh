@@ -40,13 +40,13 @@ echo "NODE_ID=node${node_id}" >> /etc/default/vdc-hva
 ip=`get_ipaddr`
 
 if [[ -z "${etcd_host}" ]]; then
-  echo "/usr/local/bin/etcdctl set hva/hosts/${node_id} \"${ip}\""
-  /usr/local/bin/etcdctl set hva/hosts/${node_id} "${ip}"
+  echo "/usr/local/bin/etcdctl set hva/hosts/node${node_id} \"${ip}\""
+  /usr/local/bin/etcdctl set hva/hosts/node${node_id} "${ip}"
 else
   echo "AMQP_ADDR=${etcd_host}" >> /etc/default/vdc-hva
   echo "AMQP_PORT=5672" >> /etc/default/vdc-hva
-  echo "/usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/${node_id} \"${ip}\""
-  /usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/${node_id} "${ip}"
+  echo "/usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/node${node_id} \"${ip}\""
+  /usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/node${node_id} "${ip}"
 fi
 
 
