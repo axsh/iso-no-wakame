@@ -340,6 +340,64 @@ EOF
          result = `#{cmd}`
       end
 
+      def config_instance_spec(hypervisor: 'kvm')
+         specs = {}
+         specs[:openvz] =<<"EOF"
+vz.small:
+  cpu_cores: 1
+  memory_size: 256
+  hypervisor: 'openvz'
+  quota_weight: 1.0
+vz.large:
+  cpu_cores: 2
+  memory_size: 256
+  hypervisor: 'openvz'
+  quota_weight: 2.0
+vz.xlarge:
+  cpu_cores: 2
+  memory_size: 1536
+  hypervisor: 'openvz'
+  quota_weight: 2.0
+EOF
+         specs[:kvm] =<<"EOF"
+kvm.small:
+  cpu_cores: 1
+  memory_size: 256
+  hypervisor: 'kvm'
+  quota_weight: 1.0
+kvm.large:
+  cpu_cores: 2
+  memory_size: 256
+  hypervisor: 'kvm'
+  quota_weight: 2.0
+kvm.xlarge:
+  cpu_cores: 2
+  memory_size: 1536
+  hypervisor: 'kvm'
+  quota_weight: 2.0
+EOF
+         specs[:lxc] =<<"EOF"
+lxc.small:
+  cpu_cores: 1
+  memory_size: 256
+  hypervisor: 'lxc'
+  quota_weight: 1.0
+lxc.large:
+  cpu_cores: 2
+  memory_size: 256
+  hypervisor: 'lxc'
+  quota_weight: 2.0
+lxc.xlarge:
+  cpu_cores: 2
+  memory_size: 1536
+  hypervisor: 'lxc'
+  quota_weight: 2.0
+EOF
+         File.open('/etc/wakame-vdc/dcmgr_gui/instance_spec.yml', 'w') do |file|
+            file.puts specs[hypervisor.to_sym]
+         end
+      end
+
       def copy_vdc_config
          FileUtils.copy '/opt/axsh/wakame-vdc/dcmgr/config/dcmgr.conf.example' '/etc/wakame-vdc/dcmgr.conf'
          FileUtils.copy '/opt/axsh/wakame-vdc/dcmgr/config/hva.conf.example' '/etc/wakame-vdc/hva.conf'
@@ -458,7 +516,11 @@ end
 
 #result = auto_1box if :auto_1box == mode
 #result = manual_1box if  :manual_1box == mode or false == result
-manual_1box unless auto_1box
+#manual_1box unless auto_1box
+unless auto_1box
+   puts "was not able to auto start"
+   exit
+end
 
 #nw = network.subnetcalc(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm])
 puts "-------------------- setup_wakame-vdc.sh -------------------"
@@ -487,6 +549,7 @@ end
 @wakeup.start_vdc_collector
 @wakeup.start_vdc_hva
 sleep 5
+@wakeup.config_instance_spec
 @wakeup.start_vdc_webui
 
 =begin
