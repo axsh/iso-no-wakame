@@ -3,12 +3,20 @@
 require 'pp'
 require 'fileutils'
 
+module FileUtils
+  def self.sed_i(file, pattern, replacement)
+    File.open(file, "r") do |f_in|
+      buf = f_in.read
+      buf.gsub!(pattern, replacement)
+      File.open(file, "w") do |f_out|
+        f_out.write(buf)
+      end
+    end
+  end
+end
+
 module WakeWakameVdc
    module UI
-      class Zenity
-         #require 'zenity'
-      end
-   
       class Dialog
          require 'rdialog'
    
@@ -340,6 +348,12 @@ EOF
          result = `#{cmd}`
       end
 
+      def config_hva_conf(param, value)
+         src = %r|^#{param} = .*|
+         dst = "#{param} = #{value}"
+         FileUtils.sed_i('/etc/wakame-vdc/hva.conf', src, dst)
+      end
+
       def config_instance_spec(hypervisor: 'kvm')
          specs = {}
          specs[:openvz] =<<"EOF"
@@ -395,6 +409,20 @@ lxc.xlarge:
 EOF
          File.open('/etc/wakame-vdc/dcmgr_gui/instance_spec.yml', 'w') do |file|
             file.puts specs[hypervisor.to_sym]
+         end
+      end
+
+      def gen_webui_shortcut(home: '/home/wakame')
+         File.open([home, 'Desktop/Wakame-VDC.WebUI.desktop'].join('/'), 'w') do |file|
+            file.puts(<<"EOF")
+[Desktop Entry]
+Version=1.0
+Type=Link
+Name=Wakame-VDC WebUI
+Comment=
+Icon=gnome-fs-bookmark
+URL=http://127.0.0.1:9000
+EOF
          end
       end
 
@@ -543,6 +571,7 @@ sleep 5
    @wakeup.add_hva(hva)
 end
 
+@wakeup.config_hva_conf('config.logging_service_host_ip', "'#{@inner_net[:ip]}'")
 @wakeup.start_rabbitmq
 @wakeup.start_mysql
 @wakeup.start_vdc_dcmgr

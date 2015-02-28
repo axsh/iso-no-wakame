@@ -70,6 +70,117 @@ dnsmasq
 vim-enhanced
 dialog
 httpd
+zenity
+
+-aic94xx-firmware
+-atmel-firmware
+-bfa-firmware
+-ipw2100-firmware
+-ipw2200-firmware
+-ivtv-firmware
+-iwl100-firmware
+-iwl1000-firmware
+-iwl3945-firmware
+-iwl4965-firmware
+-iwl5000-firmware
+-iwl5150-firmware
+-iwl6000-firmware
+-iwl6000g2a-firmware
+-iwl6050-firmware
+-libertas-usb8388-firmware
+-ql2100-firmware
+-ql2200-firmware
+-ql23xx-firmware
+-ql2400-firmware
+-ql2500-firmware
+-rt61pci-firmware
+-rt73usb-firmware
+-xorg-x11-drv-ati-firmware
+-zd1211-firmware
+-ModemManager
+-NetworkManager
+-NetworkManager-glib
+-NetworkManager-gnome
+-cdparanoia
+-cdparanoia-libs
+-cdrdao
+-cups-libs
+-evolution
+-evolution-data-server
+-evolution-help
+-evolution-mapi
+-ghostscript
+-ghostscript-fonts
+-evince
+-evince-dvi
+-evince-libs
+-libspectre
+-glusterfs
+-glusterfs-api
+-glusterfs-libs
+-samba-common
+-samba-winbind
+-samba-winbind-clients
+-samba4-libs
+-abyssinica-fonts
+-cjkuni-fonts
+-cjkuni-uming-fonts
+-dejavu-fonts
+-dejavu-sans-fonts
+-dejavu-sans-mono-fonts
+-dejavu-serif-fonts
+-google-crosextra-caladea-fonts
+-google-crosextra-carlito-fonts
+-jomolhari-fonts
+-khmeros-base-fonts
+-khmeros-fonts
+-kurdit-unikurd-web-fonts
+-liberation-fonts
+-liberation-mono-fonts
+-liberation-sans-fonts
+-liberation-serif-fonts
+-lklug-fonts
+-lohit-assamese-fonts
+-lohit-bengali-fonts
+-lohit-devanagari-fonts
+-lohit-gujarati-fonts
+-lohit-kannada-fonts
+-lohit-oriya-fonts
+-lohit-punjabi-fonts
+-lohit-tamil-fonts
+-lohit-telugu-fonts
+-madan-fonts
+-paktype-fonts
+-paktype-naqsh-fonts
+-paktype-tehreer-fonts
+-sil-padauk-fonts
+-smc-fonts
+-smc-meera-fonts
+-stix-fonts
+-thai-scalable-fonts
+-thai-scalable-waree-fonts
+-tibetan-machine-uni-fonts
+-un-core-dotum-fonts
+-un-core-fonts
+-urw-fonts
+-vlgothic-fonts
+-vlgothic-fonts
+-wqy-zenhei-fonts
+-b43-fwcutter
+-b43-openfwwf
+-bind-libs
+-bind-utils
+-dvd+rw-tools
+-brasero
+-brasero-libs
+-brasero-nautilus
+-rhythmbox
+-sound-juicer
+-ekiga
+-pidgin
+-man
+-man-pages
+-man-pages-overrides
 
 wakame-vdc
 wakame-vdc-dcmgr-vmapp-config
@@ -376,6 +487,7 @@ chown ${LIVE_USER}. -R /home/$LIVE_USER/Desktop
 /opt/axsh/wakame-vdc/ruby/bin/gem install etcd
 /opt/axsh/wakame-vdc/ruby/bin/gem install mixlib-log
 /opt/axsh/wakame-vdc/ruby/bin/gem install rdialog
+/opt/axsh/wakame-vdc/ruby/bin/gem install Zenity.rb
 
 EOF_post
 
@@ -453,8 +565,25 @@ cp -r ./MacOS-X ${INSTALL_ROOT}/usr/share/themes/
 
 ### end withX
 
+rm -rf ${INSTALL_ROOT}/usr/share/{doc,man,info}
+
 EOF_postnochroot
 
 /bin/bash -x /root/postnochroot-install 2>&1 | tee /root/postnochroot-install.log
 
+#for i in `find ${INSTALL_ROOT}/bin/ ${INSTALL_ROOT}/usr/ ${INSTALL_ROOT}/opt/ -type f`; do
+#A=`file $i | cut -d':' -f2 | grep archive`
+#if [[ ! -z $A ]]; then
+#  strip -S $i
+#fi
+#B=`file $i | cut -d':' -f2 | grep "not stripped"`
+#if [[ ! -z $B ]]; then
+#  C=`echo $i | grep lib`
+#  if [[ ! -z $C ]]; then
+#    strip -S $i
+#  else
+#    strip $i
+#  fi
+#fi
+#done
 
