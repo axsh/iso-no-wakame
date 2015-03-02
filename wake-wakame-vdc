@@ -17,6 +17,30 @@ end
 
 module WakeWakameVdc
    module UI
+      class Gdialog
+
+         def radiolist(msg, columns: nil, rows: nil, escape: false)
+            column_size = 0
+            row_args = ""
+            rows.each do |row|
+               column_size = row.size if column_size < row.size
+               row_args += row[-1].to_s
+               row_args += " '"
+               row_args += row[0..-2].join("' '")
+               row_args += "' "
+            end
+            column_args = "--column '' " * column_size
+            #puts "zenity --list --text #{msg} --radiolist #{column_args} #{row_args}"
+            result = `zenity --list --text #{msg} --radiolist #{column_args} #{row_args}`
+            if escape
+               exit if escape?
+               result = radiolist(msg, columns, rows, escape)
+            end unless result
+            return result.chomp
+         end
+
+      end
+
       class Dialog
          require 'rdialog'
    
