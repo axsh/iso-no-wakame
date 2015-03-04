@@ -19,24 +19,61 @@ module WakeWakameVdc
    module UI
       class Gdialog
 
+         def initialize
+         end
+
+         def escape?
+            constants = WakeWakameVdc::Constants.new
+            yesno(constants.messages[:escape])
+         end
+
          def radiolist(msg, columns: nil, rows: nil, escape: false)
             column_size = 0
             row_args = ""
             rows.each do |row|
                column_size = row.size if column_size < row.size
                row_args += row[-1].to_s
-               row_args += " '"
-               row_args += row[0..-2].join("' '")
-               row_args += "' "
+               row_args += ' "'
+               row_args += row[0..-2].join('" "')
+               row_args += '" '
             end
             column_args = "--column '' " * column_size
             #puts "zenity --list --text #{msg} --radiolist #{column_args} #{row_args}"
-            result = `zenity --list --text #{msg} --radiolist #{column_args} #{row_args}`
+            result = `zenity --list --text "#{msg}" --radiolist #{column_args} #{row_args}`
             if escape
                exit if escape?
                result = radiolist(msg, columns, rows, escape)
-            end unless result
+            end if '' == result
             return result.chomp
+         end
+
+         def inputbox(msg, escape: false)
+            result = `zenity --entry --text "#{msg}"`
+            if escape
+               exit if escape?
+               result = inputbox(msg, escape)
+            end if '' == result
+            return result
+         end
+   
+         def msgbox(msg, escape: false)
+            `zenity --info --text "#{msg}"`
+            result = 0 == $?.to_i
+            if escape
+               exit if escape?
+               result = msgbox(msg, escape)
+            end unless result
+            return result
+         end
+   
+         def yesno(msg, escape: false)
+            `zenity --question --text "#{msg}"`
+            result = 0 == $?.to_i
+            if escape
+               exit if escape?
+               result = yesno(msg, escape)
+            end unless result
+            return result
          end
 
       end
@@ -436,6 +473,28 @@ EOF
          end
       end
 
+      def del_wake_wakame_vdc_launcher(home: '/home/wakame')
+         FileUtils.rm_f([home, 'Desktop/WakeWakameVDC.desktop'].join('/'))
+      end
+
+      def gen_wake_wakame_vdc_launcher(home: '/home/wakame')
+         File.open([home, 'Desktop/WakeWakameVDC.desktop'].join('/'), 'w') do |file|
+            file.puts(<<"EOF")
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=WakeWakameVDC
+Comment=
+Exec=sudo /usr/local/bin/wake-wakame-vdc manual_1box
+Icon=/usr/share/icons/gnome/48x48/apps/wakamevdc-logo.png
+Path=
+Terminal=false
+StartupNotify=false
+GenericName=
+EOF
+         end
+      end
+
       def gen_webui_shortcut(home: '/home/wakame')
          File.open([home, 'Desktop/Wakame-VDC.WebUI.desktop'].join('/'), 'w') do |file|
             file.puts(<<"EOF")
@@ -444,7 +503,7 @@ Version=1.0
 Type=Link
 Name=Wakame-VDC WebUI
 Comment=
-Icon=gnome-fs-bookmark
+Icon=/usr/share/icons/gnome/48x48/apps/wakamevdc-logo.png
 URL=http://127.0.0.1:9000
 EOF
          end
@@ -483,15 +542,15 @@ EOF
                :hypervisor_kvm => 'Linux Kernel Virtual Machine',
                :hypervisor_lxc => 'Linux Containers (does not work in this LiveDVD)',
                :hypervisor_openvz => 'OpenVZ (does not work in this LiveDVD)',
-               :host_ip => 'Please enter an IP address for ',
-               :host_nm => 'Please enter a Network Mask for ',
-               :host_gw => 'Please enter a Gateway for ',
+               :host_ip => 'Please enter an IP address for host',
+               :host_nm => 'Please enter a Network Mask for host',
+               :host_gw => 'Please enter a Gateway for host',
                :hva_dhcp_min => 'Please enter a start address of DHCP range for HVA nodes',
                :hva_dhcp_max => 'Please enter an end address of DHCP range for HVA nodes',
                :vm_dhcp_min => 'Please enter a start address of DHCP range for Instances',
                :vm_dhcp_max => 'Please enter an end address of DHCP range for Instances',
                :poweron => 'Please turning on the power of your HVA hosts and then wait a few minutes.',
-               :hva_confirm => "That's it?",
+               :hva_confirm => "That\'s it?",
                :escape => 'Exit and lose any changes?',
                :confirm_terminate_dnsmasq => "If each node finished booting, please push <OK>.",
                :reconfirm_terminate_dnsmasq => "Will kill dnsmasq process.",
@@ -533,33 +592,41 @@ def auto_1box
 end
 
 def manual_1box
-   @config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
-   @config[:global, :hypervisor] = @dialog.radiolist(@constants.messages[:hypervisor], rows: @constants.hypervisors, escape: true)
+   #@config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
+   #@config[:global, :hypervisor] = @dialog.radiolist(@constants.messages[:hypervisor], rows: @constants.hypervisors, escape: true)
+   @config[:global, :structure] = 'Type 1'
+   @config[:global, :hypervisor] = 'KVM'
    @config[:dcmgr, :host_ip] = @dialog.inputbox(@constants.messages[:host_ip], escape: true)
    @config[:dcmgr, :host_nm] = @dialog.inputbox(@constants.messages[:host_nm], escape: true)
    @config[:dcmgr, :host_gw] = @dialog.inputbox(@constants.messages[:host_gw], escape: true)
-   @config[:vm, :dhcp_min] = @dialog.inputbox(@constants.messages[:vm_dhcp_min], escape: true)
-   @config[:vm, :dhcp_max] = @dialog.inputbox(@constants.messages[:vm_dhcp_max], escape: true)
-   
+   #@config[:vm, :dhcp_min] = @dialog.inputbox(@constants.messages[:vm_dhcp_min], escape: true)
+   #@config[:vm, :dhcp_max] = @dialog.inputbox(@constants.messages[:vm_dhcp_max], escape: true)
+   nic = @network.list_linked_interfaces[0]
+   nic = 'eth0' unless nic
    confirm = <<"EOL"
 Structure: #{@config[:global, :structure]}
 Hypervisor: #{@config[:global, :hypervisor]}
-eth0's IP address: #{@config[:dcmgr, :host_ip]}
-eth0's Subnet Mask: #{@config[:dcmgr, :host_nm]}
-eth0's Gateway address: #{@config[:dcmgr, :host_gw]}
-dhcp range for Instances: #{@config[:vm, :dhcp_min]} - #{@config[:vm, :dhcp_max]}
+#{nic}\'s IP address: #{@config[:dcmgr, :host_ip]}
+#{nic}\'s Subnet Mask: #{@config[:dcmgr, :host_nm]}
+#{nic}\'s Gateway address: #{@config[:dcmgr, :host_gw]}
 EOL
    @dialog.msgbox(confirm, escape: true)
-   nic = network.list_linked_interfaces[0]
-   @network.make_network_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], device: nic, ether_type: 'Ethernet')
-   @inner_net = @network.guess_unused_segment
-   @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'br0', ether_type: 'Bridge')
+   @network.make_network_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], gw: @config[:dcmgr, :host_gw], device: nic, dhcp: false, ether_type: 'Ethernet')
    @network.network_restart
-   result = true
+   if 0 < @network.list_ip_addresses.size
+      @inner_net = @network.guess_unused_segment
+      @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'br0', ether_type: 'Bridge')
+      @network.network_restart
+      result = true
+   end
+   return result
 end
 
-
-@dialog = WakeWakameVdc::UI::Dialog.new
+if ENV['DISPLAY']
+   @dialog = WakeWakameVdc::UI::Gdialog.new
+else
+   @dialog = WakeWakameVdc::UI::Dialog.new
+end
 @constants = WakeWakameVdc::Constants.new
 @config = WakeWakameVdc::Config.new
 @network = WakeWakameVdc::Networking.new
@@ -569,9 +636,17 @@ end
 #result = auto_1box if :auto_1box == mode
 #result = manual_1box if  :manual_1box == mode or false == result
 #manual_1box unless auto_1box
-unless auto_1box
-   puts "was not able to auto start"
-   exit
+if 'auto_1box' == ARGV[0]
+   unless auto_1box
+      @wakeup.gen_wake_wakame_vdc_launcher
+      puts "was not able to auto start"
+      exit
+   end
+elsif 'manual_1box' == ARGV[0]
+   unless manual_1box
+      puts "unknown state"
+      exit
+   end
 end
 
 #nw = network.subnetcalc(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm])
@@ -604,6 +679,9 @@ end
 sleep 5
 @wakeup.config_instance_spec
 @wakeup.start_vdc_webui
+
+@wakeup.del_wake_wakame_vdc_launcher
+@wakeup.gen_webui_shortcut
 
 =begin
 config[:global, :structure] = dialog.radiolist(constants.messages[:structure], rows: constants.structures, escape: true)

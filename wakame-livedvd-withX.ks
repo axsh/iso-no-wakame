@@ -181,6 +181,36 @@ zenity
 -man
 -man-pages
 -man-pages-overrides
+-abrt
+-abrt-addon-ccpp
+-abrt-addon-kerneloops
+-abrt-addon-python
+-abrt-cli
+-abrt-libs
+-abrt-tui
+-cdparanoia-libs
+-cheese
+-gnome-applets
+-gstreamer-plugins-bad-free
+-gstreamer-plugins-base
+-gstreamer-plugins-bood
+-totem
+-totem-mozplugin
+-totem-nautilus
+-xfce4-mixer
+-compiz
+-compiz-gnome
+-docbook-dtds
+-firstboot
+-system-config-date
+-system-config-date-docs
+-system-config-kdump
+-system-config-services
+-system-config-services-docs
+-system-config-users
+-system-config-users-docs
+-yelp
+-m17n-contrib
 
 wakame-vdc
 wakame-vdc-dcmgr-vmapp-config
@@ -196,7 +226,7 @@ wakame-vdc-webui-vmapp-config
 
 cp -a /etc/resolv.conf /etc/resolv.conf.orig
 echo "nameserver 192.168.122.1" >> /etc/resolv.conf
-echo "Wakame-VDC LiveDVD release 15.02 (Final)" > /etc/redhat-release
+echo "Wakame-VDC LiveDVD release 15.03 (RC1)" > /etc/redhat-release
 
 LIVE_USER="wakame"
 
@@ -224,276 +254,27 @@ gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults
 sed -i -e "s|^STARTKDE.*|\0\nSTARTXFCE=\"\$(which startxfce4 2>/dev/null)\"/" /etc/X11/xinit/Xclients
 sed -i -e "s|PREFERRED=\"\$STARTKDE.*|\0\n    elif [ \"\$DESKTOP\" = \"XFCE\" ]; then\n\tPREFERRED=\"\$STARTXFCE\"|" /etc/X11/xinit/Xclients
 
-cat > /home/$LIVE_USER/.dmrc << EOF_dmrc
-[Desktop]
-Language=en_US.utf8
-Session=xfce
-EOF_dmrc
-chown $LIVE_USER. /home/$LIVE_USER/.dmrc
 cat /etc/sysconfig/desktop << EOF_sysconfig_desktop
 DESKTOP=XFCE
 DISPLAYMANAGER=GNOME
 EOF_sysconfig_desktop
 
-mkdir -p /home/$LIVE_USER/.config/Terminal
-cat > /home/$LIVE_USER/.config/Terminal/terminalrc << EOF_terminalrc
-[Configuration]
-MiscAlwaysShowTabs=FALSE
-MiscBell=FALSE
-MiscBordersDefault=TRUE
-MiscCursorBlinks=FALSE
-MiscCursorShape=TERMINAL_CURSOR_SHAPE_BLOCK
-MiscDefaultGeometry=80x24
-MiscInheritGeometry=FALSE
-MiscMenubarDefault=TRUE
-MiscMouseAutohide=FALSE
-MiscToolbarsDefault=TRUE
-MiscConfirmClose=TRUE
-MiscCycleTabs=TRUE
-MiscTabCloseButtons=TRUE
-MiscTabCloseMiddleClick=TRUE
-MiscTabPosition=GTK_POS_TOP
-MiscHighlightUrls=TRUE
-FontName=Yutapon coding RegularBackslash 12
-EOF_terminalrc
 
-mkdir -p /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml
-cat > /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml << EOF_xfwm4
-<?xml version="1.0" encoding="UTF-8"?>
 
-<channel name="xfwm4" version="1.0">
-  <property name="general" type="empty">
-    <property name="activate_action" type="string" value="bring"/>
-    <property name="borderless_maximize" type="bool" value="true"/>
-    <property name="box_move" type="bool" value="false"/>
-    <property name="box_resize" type="bool" value="false"/>
-    <property name="button_layout" type="string" value="O|SHMC"/>
-    <property name="button_offset" type="int" value="0"/>
-    <property name="button_spacing" type="int" value="0"/>
-    <property name="click_to_focus" type="bool" value="true"/>
-    <property name="focus_delay" type="int" value="250"/>
-    <property name="cycle_apps_only" type="bool" value="false"/>
-    <property name="cycle_draw_frame" type="bool" value="true"/>
-    <property name="cycle_hidden" type="bool" value="true"/>
-    <property name="cycle_minimum" type="bool" value="true"/>
-    <property name="cycle_workspaces" type="bool" value="false"/>
-    <property name="double_click_time" type="int" value="250"/>
-    <property name="double_click_distance" type="int" value="5"/>
-    <property name="double_click_action" type="string" value="maximize"/>
-    <property name="easy_click" type="string" value="Alt"/>
-    <property name="focus_hint" type="bool" value="true"/>
-    <property name="focus_new" type="bool" value="true"/>
-    <property name="frame_opacity" type="int" value="100"/>
-    <property name="full_width_title" type="bool" value="true"/>
-    <property name="inactive_opacity" type="int" value="100"/>
-    <property name="maximized_offset" type="int" value="0"/>
-    <property name="move_opacity" type="int" value="100"/>
-    <property name="placement_ratio" type="int" value="20"/>
-    <property name="placement_mode" type="string" value="center"/>
-    <property name="popup_opacity" type="int" value="100"/>
-    <property name="mousewheel_rollup" type="bool" value="true"/>
-    <property name="prevent_focus_stealing" type="bool" value="false"/>
-    <property name="raise_delay" type="int" value="250"/>
-    <property name="raise_on_click" type="bool" value="true"/>
-    <property name="raise_on_focus" type="bool" value="false"/>
-    <property name="raise_with_any_button" type="bool" value="true"/>
-    <property name="repeat_urgent_blink" type="bool" value="false"/>
-    <property name="resize_opacity" type="int" value="100"/>
-    <property name="restore_on_move" type="bool" value="true"/>
-    <property name="scroll_workspaces" type="bool" value="true"/>
-    <property name="shadow_delta_height" type="int" value="0"/>
-    <property name="shadow_delta_width" type="int" value="0"/>
-    <property name="shadow_delta_x" type="int" value="0"/>
-    <property name="shadow_delta_y" type="int" value="-3"/>
-    <property name="shadow_opacity" type="int" value="50"/>
-    <property name="show_app_icon" type="bool" value="false"/>
-    <property name="show_dock_shadow" type="bool" value="true"/>
-    <property name="show_frame_shadow" type="bool" value="false"/>
-    <property name="show_popup_shadow" type="bool" value="false"/>
-    <property name="snap_resist" type="bool" value="false"/>
-    <property name="snap_to_border" type="bool" value="true"/>
-    <property name="snap_to_windows" type="bool" value="false"/>
-    <property name="snap_width" type="int" value="10"/>
-    <property name="theme" type="string" value="Agua"/>
-    <property name="tile_on_move" type="bool" value="true"/>
-    <property name="title_alignment" type="string" value="center"/>
-    <property name="title_font" type="string" value="Yutapon coding RegularBackslash 9"/>
-    <property name="title_horizontal_offset" type="int" value="0"/>
-    <property name="title_shadow_active" type="string" value="false"/>
-    <property name="title_shadow_inactive" type="string" value="false"/>
-    <property name="title_vertical_offset_active" type="int" value="0"/>
-    <property name="title_vertical_offset_inactive" type="int" value="0"/>
-    <property name="toggle_workspaces" type="bool" value="false"/>
-    <property name="unredirect_overlays" type="bool" value="true"/>
-    <property name="urgent_blink" type="bool" value="false"/>
-    <property name="use_compositing" type="bool" value="false"/>
-    <property name="workspace_count" type="int" value="4"/>
-    <property name="wrap_cycle" type="bool" value="true"/>
-    <property name="workspace_names" type="array">
-      <value type="string" value="Workspace 1"/>
-      <value type="string" value="Workspace 2"/>
-      <value type="string" value="Workspace 3"/>
-      <value type="string" value="Workspace 4"/>
-    </property>
-    <property name="wrap_layout" type="bool" value="true"/>
-    <property name="wrap_resistance" type="int" value="10"/>
-    <property name="wrap_windows" type="bool" value="true"/>
-    <property name="wrap_workspaces" type="bool" value="false"/>
-  </property>
-</channel>
-EOF_xfwm4
 
-cat > /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml << EOF_xsettings
-<?xml version="1.0" encoding="UTF-8"?>
-
-<channel name="xsettings" version="1.0">
-  <property name="Net" type="empty">
-    <property name="ThemeName" type="string" value="MacOS-X"/>
-    <property name="IconThemeName" type="Gant.Xfce"/>
-    <property name="DoubleClickTime" type="int" value="250"/>
-    <property name="DoubleClickDistance" type="int" value="5"/>
-    <property name="DndDragThreshold" type="int" value="8"/>
-    <property name="CursorBlink" type="bool" value="true"/>
-    <property name="CursorBlinkTime" type="int" value="1200"/>
-    <property name="SoundThemeName" type="string" value="default"/>
-    <property name="EnableEventSounds" type="bool" value="false"/>
-    <property name="EnableInputFeedbackSounds" type="bool" value="false"/>
-  </property>
-  <property name="Xft" type="empty">
-    <property name="DPI" type="empty"/>
-    <property name="Antialias" type="int" value="-1"/>
-    <property name="Hinting" type="int" value="-1"/>
-    <property name="HintStyle" type="string" value="hintnone"/>
-    <property name="RGBA" type="string" value="none"/>
-  </property>
-  <property name="Gtk" type="empty">
-    <property name="CanChangeAccels" type="bool" value="false"/>
-    <property name="ColorPalette" type="string" value="black:white:gray50:red:purple:blue:light blue:green:yellow:orange:lavender:brown:goldenrod4:dodger blue:pink:light green:gray10:gray30:gray75:gray90"/>
-    <property name="FontName" type="string" value="Yutapon coding Heavy Sl 10"/>
-    <property name="IconSizes" type="string" value=""/>
-    <property name="KeyThemeName" type="string" value=""/>
-    <property name="ToolbarStyle" type="string" value="icons"/>
-    <property name="ToolbarIconSize" type="int" value="3"/>
-    <property name="IMPreeditStyle" type="string" value=""/>
-    <property name="IMStatusStyle" type="string" value=""/>
-    <property name="MenuImages" type="bool" value="true"/>
-    <property name="ButtonImages" type="bool" value="true"/>
-    <property name="MenuBarAccel" type="string" value="F10"/>
-    <property name="CursorThemeName" type="string" value=""/>
-    <property name="CursorThemeSize" type="int" value="0"/>
-    <property name="IMModule" type="string" value=""/>
-  </property>
-</channel>
-EOF_xsettings
-
-cat > /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml << EOF_xfce4panel
-<?xml version="1.0" encoding="UTF-8"?>
-
-<channel name="xfce4-panel" version="1.0">
-  <property name="panels" type="uint" value="2">
-    <property name="panel-0" type="empty">
-      <property name="position" type="string" value="p=6;x=0;y=0"/>
-      <property name="length" type="uint" value="100"/>
-      <property name="position-locked" type="bool" value="true"/>
-      <property name="plugin-ids" type="array">
-        <value type="int" value="1"/>
-        <value type="int" value="2"/>
-        <value type="int" value="3"/>
-        <value type="int" value="4"/>
-        <value type="int" value="5"/>
-        <value type="int" value="6"/>
-        <value type="int" value="15"/>
-      </property>
-    </property>
-    <property name="panel-1" type="empty">
-      <property name="position" type="string" value="p=10;x=0;y=0"/>
-      <property name="size" type="uint" value="40"/>
-      <property name="position-locked" type="bool" value="true"/>
-      <property name="plugin-ids" type="array">
-        <value type="int" value="7"/>
-        <value type="int" value="8"/>
-        <value type="int" value="9"/>
-        <value type="int" value="10"/>
-        <value type="int" value="11"/>
-        <value type="int" value="12"/>
-        <value type="int" value="13"/>
-        <value type="int" value="14"/>
-      </property>
-    </property>
-  </property>
-  <property name="plugins" type="empty">
-    <property name="plugin-1" type="string" value="applicationsmenu"/>
-    <property name="plugin-2" type="string" value="actions"/>
-    <property name="plugin-3" type="string" value="tasklist"/>
-    <property name="plugin-4" type="string" value="pager"/>
-    <property name="plugin-5" type="string" value="clock"/>
-    <property name="plugin-6" type="string" value="systray">
-      <property name="names-visible" type="array">
-        <value type="string" value="gnome-power-manager"/>
-        <value type="string" value="networkmanager applet"/>
-        <value type="string" value="gnome-volume-control-applet"/>
-      </property>
-    </property>
-    <property name="plugin-15" type="string" value="xfce4-mixer-plugin"/>
-    <property name="plugin-7" type="string" value="showdesktop"/>
-    <property name="plugin-8" type="string" value="separator">
-      <property name="style" type="uint" value="1"/>
-    </property>
-    <property name="plugin-9" type="string" value="launcher">
-      <property name="items" type="array">
-        <value type="string" value="14245876745.desktop"/>
-      </property>
-    </property>
-    <property name="plugin-10" type="string" value="launcher">
-      <property name="items" type="array">
-        <value type="string" value="14245876746.desktop"/>
-      </property>
-    </property>
-    <property name="plugin-11" type="string" value="launcher">
-      <property name="items" type="array">
-        <value type="string" value="14245876747.desktop"/>
-      </property>
-    </property>
-    <property name="plugin-12" type="string" value="launcher">
-      <property name="items" type="array">
-        <value type="string" value="14245876758.desktop"/>
-      </property>
-    </property>
-    <property name="plugin-13" type="string" value="separator">
-      <property name="style" type="uint" value="1"/>
-    </property>
-    <property name="plugin-14" type="string" value="directorymenu">
-      <property name="base-directory" type="string" value="/home/wakame"/>
-    </property>
-  </property>
-</channel>
-EOF_xfce4panel
-rm -f /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
-chown ${LIVE_USER}. -R /home/$LIVE_USER/.config
-mkdir -p /home/$LIVE_USER/Desktop
-cat > /home/$LIVE_USER/Desktop/Wakame-VDC.WebUI.desktop << EOF_webuiurl
-[Desktop Entry]
-Version=1.0
-Type=Link
-Name=Wakame-VDC WebUI
-Comment=
-Icon=gnome-fs-bookmark
-URL=http://127.0.0.1:9000
-EOF_webuiurl
-chown ${LIVE_USER}. -R /home/$LIVE_USER/Desktop
 
 ### end withX
 
 /opt/axsh/wakame-vdc/ruby/bin/gem install etcd
 /opt/axsh/wakame-vdc/ruby/bin/gem install mixlib-log
 /opt/axsh/wakame-vdc/ruby/bin/gem install rdialog
-/opt/axsh/wakame-vdc/ruby/bin/gem install Zenity.rb
+#/opt/axsh/wakame-vdc/ruby/bin/gem install Zenity.rb
 
 EOF_post
 
 /bin/bash -x /root/post-install 2>&1 | tee /root/post-install.log
 
-#echo "timeout 40;" > /etc/dhclient.conf
+echo "timeout 20;" > /etc/dhclient.conf
 cp /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 
 %post --nochroot
@@ -541,7 +322,7 @@ chmod +x ${INSTALL_ROOT}/usr/local/bin/stone
 cat >> ${INSTALL_ROOT}/etc/rc.local << EOF_rclocal
 [[ `grep etcd_host /proc/cmdline | wc -l` -eq 0 ]] && sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
 sudo /usr/local/bin/etcd -listen-client-urls=http://0.0.0.0:4001 -listen-peer-urls=http://0.0.0.0:7001 > /var/log/etcd.log 2>&1 &
-sudo /usr/local/bin/wake-wakame-vdc >> /var/log/wakame-vdc.livedvd.log 2>&1
+sudo /usr/local/bin/wake-wakame-vdc auto_1box >> /var/log/wakame-vdc.livedvd.log 2>&1
 EOF_rclocal
 
 #cp -a ./gems/gems/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/gems/
@@ -562,6 +343,19 @@ cp -r ./fonts/yutapon_coding ${INSTALL_ROOT}/usr/share/fonts/
 cp -r ./fonts/yutaCo2 ${INSTALL_ROOT}/usr/share/fonts/
 
 cp -r ./MacOS-X ${INSTALL_ROOT}/usr/share/themes/
+
+cp icons/16x16.wakamevdc-logo.png ${INSTALL_ROOT}/usr/share/icons/gnome/16x16/apps/wakamevdc-logo.png
+cp icons/22x22.wakamevdc-logo.png ${INSTALL_ROOT}/usr/share/icons/gnome/22x22/apps/wakamevdc-logo.png
+cp icons/24x24.wakamevdc-logo.png ${INSTALL_ROOT}/usr/share/icons/gnome/24x24/apps/wakamevdc-logo.png
+cp icons/32x32.wakamevdc-logo.png ${INSTALL_ROOT}/usr/share/icons/gnome/32x32/apps/wakamevdc-logo.png
+cp icons/48x48.wakamevdc-logo.png ${INSTALL_ROOT}/usr/share/icons/gnome/48x48/apps/wakamevdc-logo.png
+
+cp ./home/wakame/.dmrc ${INSTALL_ROOT}/home/wakame/
+cp -r ./home/wakame/.config ${INSTALL_ROOT}/home/wakame/
+/usr/sbin/chroot ${INSTALL_ROOT}/ chown wakame. /home/wakame/.dmrc
+/usr/sbin/chroot ${INSTALL_ROOT}/ chown wakame. -R /home/wakame/.config
+mkdir -p ${INSTALL_ROOT}/home/wakame/Desktop
+/usr/sbin/chroot ${INSTALL_ROOT}/ chown wakame. -R /home/wakame/Desktop
 
 ### end withX
 
