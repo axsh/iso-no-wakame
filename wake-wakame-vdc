@@ -76,6 +76,15 @@ module WakeWakameVdc
             return result
          end
 
+         def progress(msg, title: title, cmd: cmd, escape: false)
+            `#{cmd} | zenity --progress --title="#{title}" --text="#{msg}" --percentage=0 --auto-close`
+            result = 0 == $?.to_i
+            if escape
+               exit if escape?
+               result = yesno(msg, escape)
+            end unless result
+            return result
+         end
       end
 
       class Dialog
@@ -531,6 +540,7 @@ EOF
    class Constants
       attr_reader :messages, :structures, :hypervisors
       attr_reader :network_conf, :pxe_cfg, :dnsmasq_pid
+      attr_reader :progress_status
       def initialize(lang: 'en', distro: 'centos')
          case lang
          when 'en'
@@ -570,6 +580,7 @@ EOF
             @network_conf = '/etc/sysconfig/network-scripts/'
             @pxe_cfg = '/tftpboot/pxelinux.cfg/default'
             @dnsmasq_pid = '/var/run/dnsmasq.pid'
+            @progress_status = '/tmp/wake-wakame-vdc.progress'
          end
       end
    end
@@ -611,6 +622,10 @@ Hypervisor: #{@config[:global, :hypervisor]}
 #{nic}\'s Gateway address: #{@config[:dcmgr, :host_gw]}
 EOL
    @dialog.msgbox(confirm, escape: true)
+   `echo "" > #{@constants.progress_status}`
+   fork do
+      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+   end
    @network.make_network_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], gw: @config[:dcmgr, :host_gw], device: nic, dhcp: false, ether_type: 'Ethernet')
    @network.network_restart
    if 0 < @network.list_ip_addresses.size
@@ -619,6 +634,7 @@ EOL
       @network.network_restart
       result = true
    end
+   `echo "10" >> #{@constants.progress_status}`
    return result
 end
 
@@ -649,6 +665,8 @@ elsif 'manual_1box' == ARGV[0]
    end
 end
 
+`echo "20" >> #{@constants.progress_status}`
+`echo "# invoke setup_wakame-vdc.sh" >> #{@constants.progress_status}`
 #nw = network.subnetcalc(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm])
 puts "-------------------- setup_wakame-vdc.sh -------------------"
 result = `IP="#{@inner_net[:ip]}" \
@@ -658,30 +676,41 @@ result = `IP="#{@inner_net[:ip]}" \
  DHCP_RANGE_END="#{@inner_net[:vm_dhcp_max]}" \
  /usr/local/bin/setup_wakame-vdc.sh`
 
+`echo "40" >> #{@constants.progress_status}`
 pp result
 
+`echo "# invoke setup_wakame-vdc.hva.sh" >> #{@constants.progress_status}`
 puts "-------------------- setup_wakame-vdc.hva.sh -------------------"
 result = `/usr/local/bin/setup_wakame-vdc.hva.sh`
 pp result
+`echo "50" >> #{@constants.progress_status}`
 
 sleep 5
 
+`echo "# configure vdc components" >> #{@constants.progress_status}`
 @config.retrieve_hva_hosts.each do |hva|
    @wakeup.add_hva(hva)
 end
 
 @wakeup.config_hva_conf('config.logging_service_host_ip', "'#{@inner_net[:ip]}'")
+`echo "60" >> #{@constants.progress_status}`
+`echo "# start services" >> #{@constants.progress_status}`
 @wakeup.start_rabbitmq
 @wakeup.start_mysql
 @wakeup.start_vdc_dcmgr
 @wakeup.start_vdc_collector
 @wakeup.start_vdc_hva
+`echo "70" >> #{@constants.progress_status}`
 sleep 5
 @wakeup.config_instance_spec
 @wakeup.start_vdc_webui
+`echo "80" >> #{@constants.progress_status}`
 
+`echo "# put shortcut of wakame on desktop" >> #{@constants.progress_status}`
 @wakeup.del_wake_wakame_vdc_launcher
 @wakeup.gen_webui_shortcut
+`echo "100" >> #{@constants.progress_status}`
+Process.waitall
 
 =begin
 config[:global, :structure] = dialog.radiolist(constants.messages[:structure], rows: constants.structures, escape: true)

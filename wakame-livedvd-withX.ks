@@ -226,7 +226,7 @@ wakame-vdc-webui-vmapp-config
 
 cp -a /etc/resolv.conf /etc/resolv.conf.orig
 echo "nameserver 192.168.122.1" >> /etc/resolv.conf
-echo "Wakame-VDC LiveDVD release 15.03 (RC1)" > /etc/redhat-release
+echo "Wakame-VDC LiveDVD release 15.03 (RC2)" > /etc/redhat-release
 
 LIVE_USER="wakame"
 
@@ -292,6 +292,8 @@ cp -a ./setup_wakame-vdc.hva.sh ${INSTALL_ROOT}/usr/local/bin/
 chmod +x ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.hva.sh
 cp -a ./wake-wakame-vdc ${INSTALL_ROOT}/usr/local/bin/
 chmod +x ${INSTALL_ROOT}/usr/local/bin/wake-wakame-vdc
+cp -a ./zenity-progress-conditioner.rb ${INSTALL_ROOT}/usr/local/bin/
+chmod +x ${INSTALL_ROOT}/usr/local/bin/zenity-progress-conditioner.rb
 
 mkdir -p ${INSTALL_ROOT}/var/lib/wakame-vdc/images
 cp -a ./ubuntu-lucid-kvm-md-32.raw.gz ${INSTALL_ROOT}/var/lib/wakame-vdc/images/
