@@ -150,11 +150,11 @@ module WakeWakameVdc
          rescue Etcd::KeyNotFound => e
             result = []
          end
-         return result
+         return result.chomp
       end
 
       def []=(category, param, value)
-         @etcd.set("/#{category.to_s}/#{param.to_s}", value: value)
+         @etcd.set("/#{category.to_s}/#{param.to_s}", value: value.chomp)
       end
 
       def retrieve_hva_hosts()
@@ -181,6 +181,11 @@ module WakeWakameVdc
          end
          @config = WakeWakameVdc::Config.new
          @constants = WakeWakameVdc::Constants.new
+         if ENV['DISPLAY']
+            @dialog = WakeWakameVdc::UI::Gdialog.new
+         else
+            @dialog = WakeWakameVdc::UI::Dialog.new
+         end
       end
 
       def list_linked_interfaces_centos
@@ -283,13 +288,14 @@ EOF
       end
 
       def boot_dnsmasq_centos
+         `echo "/usr/sbin/dnsmasq --dhcp-range=#{@config[:hva, :dhcp_min]},#{@config[:hva, :dhcp_max]} --dhcp-boot=pxelinux.0 --enable-tftp --tftp-root=/tftpboot --interface=br0" >> /var/log/wakame-vdc.livedvd.log`
          result = `/usr/sbin/dnsmasq --dhcp-range=#{@config[:hva, :dhcp_min]},#{@config[:hva, :dhcp_max]} --dhcp-boot=pxelinux.0 --enable-tftp --tftp-root=/tftpboot --interface=br0`
       end
 
       def terminate_dnsmasq_centos
          if FileTest.exist?(@constants.dnsmasq_pid)
-            dialog.msgbox(@constants.messages[:confirm_terminate_dnsmasq]) if yesno
-            dialog.msgbox(@constants.messages[:reconfirm_terminate_dnsmasq]) if yesno
+            # @dialog.msgbox(@constants.messages[:confirm_terminate_dnsmasq])
+            # @dialog.msgbox(@constants.messages[:reconfirm_terminate_dnsmasq])
             pid = File.open(@constants.dnsmasq_pid, 'r').read.chomp
             `/bin/kill -SIGTERM #{pid}`
             `rm -f #{@constants.dnsmasq_pid}`
@@ -306,8 +312,11 @@ timeout 10
 menu title Wakame-VDC LiveDVD
 label pxeboot
 	menu label Wakame-VDC HVA
-	kernel iso/isolinux/vmlinuz0
-	append initrd=iso/isolinux/initrd0.img fetch=tftp://#{@config[:dcmgr, :host_ip]}/iso/LiveOS/squashfs.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ip=dhcp ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001
+#	kernel iso/isolinux/vmlinuz0
+        KERNEL vmlinuz0
+	APPEND rootflags=loop initrd=initrd0.img root=live:/Wakame-VDC.LiveDVD.iso rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM ip=dhcp etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001 3
+#	APPEND rootflags=loop initrd=initrd0.img root=live:/Wakame-VDC.LiveDVD.iso rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM
+#	append initrd=iso/isolinux/initrd0.img fetch=tftp://#{@config[:dcmgr, :host_ip]}/iso/LiveOS/squashfs.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ip=dhcp ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001
 onerror localboot -1
          EOF
          File.open("/tftpboot/pxelinux.cfg/default", 'w') do |file|
@@ -316,6 +325,8 @@ onerror localboot -1
       end
 
       def subnetcalc(ip: '127.0.0.1', nm: '255.255.255.0')
+         nw_address = ''
+         nw_prefix = ''
          `subnetcalc #{ip} #{nm} -n`.each_line do |line|
             if /^Network / =~ line
                nw_address, nw_prefix = line.chomp.split("=")[1].split("/")
@@ -560,6 +571,7 @@ EOF
                :vm_dhcp_min => 'Please enter a start address of DHCP range for Instances',
                :vm_dhcp_max => 'Please enter an end address of DHCP range for Instances',
                :poweron => 'Please turning on the power of your HVA hosts and then wait a few minutes.',
+               :hva_hosts => 'nodes:',
                :hva_confirm => "That\'s it?",
                :escape => 'Exit and lose any changes?',
                :confirm_terminate_dnsmasq => "If each node finished booting, please push <OK>.",
@@ -588,6 +600,8 @@ EOF
 end
 
 def auto_1box
+   @config[:global, :structure] = 'Type 1'
+   @config[:global, :hypervisor] = 'KVM'
    result = false
    nic = @network.list_linked_interfaces[0]
    nic = 'eth0' unless nic
@@ -628,14 +642,75 @@ EOL
    end
    @network.make_network_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], gw: @config[:dcmgr, :host_gw], device: nic, dhcp: false, ether_type: 'Ethernet')
    @network.network_restart
+   `echo "10" >> #{@constants.progress_status}`
    if 0 < @network.list_ip_addresses.size
       @inner_net = @network.guess_unused_segment
       @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'br0', ether_type: 'Bridge')
       @network.network_restart
       result = true
    end
-   `echo "10" >> #{@constants.progress_status}`
+   `echo "20" >> #{@constants.progress_status}`
    return result
+end
+
+def manual_boxes
+   @config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
+   @config[:global, :hypervisor] = @dialog.radiolist(@constants.messages[:hypervisor], rows: @constants.hypervisors, escape: true)
+   @config[:dcmgr, :host_ip] = @dialog.inputbox(@constants.messages[:host_ip], escape: true)
+   @config[:dcmgr, :host_nm] = @dialog.inputbox(@constants.messages[:host_nm], escape: true)
+   @config[:dcmgr, :host_gw] = @dialog.inputbox(@constants.messages[:host_gw], escape: true)
+   @config[:vm, :dhcp_min] = @dialog.inputbox(@constants.messages[:vm_dhcp_min], escape: true)
+   @config[:vm, :dhcp_max] = @dialog.inputbox(@constants.messages[:vm_dhcp_max], escape: true)
+   nic = @network.list_linked_interfaces[0]
+   nic = 'eth0' unless nic
+   confirm = <<"EOL"
+Structure: #{@config[:global, :structure]}
+Hypervisor: #{@config[:global, :hypervisor]}
+#{nic}\'s IP address: #{@config[:dcmgr, :host_ip]}
+#{nic}\'s Subnet Mask: #{@config[:dcmgr, :host_nm]}
+#{nic}\'s Gateway address: #{@config[:dcmgr, :host_gw]}
+dhcp range for Instances: #{@config[:vm, :dhcp_min]} - #{@config[:vm, :dhcp_max]}
+EOL
+   if 'Type 2' == @config[:global, :structure]
+      @config[:hva, :dhcp_min] = @dialog.inputbox(@constants.messages[:hva_dhcp_min], escape: true)
+      @config[:hva, :dhcp_max] = @dialog.inputbox(@constants.messages[:hva_dhcp_max], escape: true)
+      confirm += <<-"EOL"
+dhcp range for Wakame-VDC HVA nodes: #{@config[:hva, :dhcp_min]} - #{@config[:hva, :dhcp_max]}
+      EOL
+   end
+
+   @dialog.msgbox(confirm, escape: true)
+   @network.make_bridge_and_attach_physical_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], gw: @config[:dcmgr, :host_gw], physical: nic, bridge: 'br0')
+   @network.network_restart
+   if 'Type 2' == @config[:global, :structure]
+      @network.create_pxe_cfg
+      @network.boot_dnsmasq
+      yesno = false
+      until yesno do
+         @dialog.msgbox(@constants.messages[:poweron])
+         hva_hosts = @config.retrieve_hva_hosts
+         next unless hva_hosts
+         hva_hosts_list = hva_hosts.join("\n")
+         @dialog.msgbox(@constants.messages[:hva_hosts] + "\n" + hva_hosts_list, escape: true)
+         yesno = @dialog.msgbox(@constants.messages[:hva_confirm])
+      end
+      exit unless yesno
+   end
+   @network.terminate_dnsmasq
+   subnet = @network.subnetcalc(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm])
+   @inner_net = {}
+   @inner_net[:ip] = @config[:dcmgr, :host_ip]
+   @inner_net[:nw] = subnet[:nw_address]
+   @inner_net[:prefix] = subnet[:nw_prefix]
+   @inner_net[:vm_dhcp_min] = @config[:vm, :dhcp_min]
+   @inner_net[:vm_dhcp_max] = @config[:vm, :dhcp_max]
+   `echo "" > #{@constants.progress_status}`
+   fork do
+      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+   end
+   `echo "10" >> #{@constants.progress_status}`
+   `echo "20" >> #{@constants.progress_status}`
+   return yesno
 end
 
 if ENV['DISPLAY']
@@ -663,9 +738,20 @@ elsif 'manual_1box' == ARGV[0]
       puts "unknown state"
       exit
    end
+elsif 'manual_boxes' == ARGV[0]
+   unless manual_boxes
+      puts "unknown state"
+      exit
+   end
 end
 
-`echo "20" >> #{@constants.progress_status}`
+case @config[:global, :hypervisor]
+when 'LXC'
+   `/bin/sed -i -e "s/hypervisor kvm/hypervisor lxc/" /usr/local/bin/setup_wakame-vdc.sh`
+when 'OpenVZ'
+   `/bin/sed -i -e "s/hypervisor kvm/hypervisor openvz/" /usr/local/bin/setup_wakame-vdc.sh`
+end
+`echo "30" >> #{@constants.progress_status}`
 `echo "# invoke setup_wakame-vdc.sh" >> #{@constants.progress_status}`
 #nw = network.subnetcalc(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm])
 puts "-------------------- setup_wakame-vdc.sh -------------------"
@@ -679,10 +765,12 @@ result = `IP="#{@inner_net[:ip]}" \
 `echo "40" >> #{@constants.progress_status}`
 pp result
 
+unless 'Type 2' == @config[:global, :structure]
 `echo "# invoke setup_wakame-vdc.hva.sh" >> #{@constants.progress_status}`
 puts "-------------------- setup_wakame-vdc.hva.sh -------------------"
 result = `/usr/local/bin/setup_wakame-vdc.hva.sh`
 pp result
+end
 `echo "50" >> #{@constants.progress_status}`
 
 sleep 5
@@ -692,22 +780,29 @@ sleep 5
    @wakeup.add_hva(hva)
 end
 
-@wakeup.config_hva_conf('config.logging_service_host_ip', "'#{@inner_net[:ip]}'")
 `echo "60" >> #{@constants.progress_status}`
+@wakeup.config_hva_conf('config.logging_service_host_ip', "'#{@inner_net[:ip]}'") unless 'Type 2' == @config[:global, :structure]
+`echo "64" >> #{@constants.progress_status}`
 `echo "# start services" >> #{@constants.progress_status}`
 @wakeup.start_rabbitmq
+`echo "68" >> #{@constants.progress_status}`
 @wakeup.start_mysql
+`echo "72" >> #{@constants.progress_status}`
 @wakeup.start_vdc_dcmgr
+`echo "76" >> #{@constants.progress_status}`
 @wakeup.start_vdc_collector
-@wakeup.start_vdc_hva
-`echo "70" >> #{@constants.progress_status}`
+`echo "80" >> #{@constants.progress_status}`
+@wakeup.start_vdc_hva unless 'Type 2' == @config[:global, :structure]
+`echo "84" >> #{@constants.progress_status}`
 sleep 5
 @wakeup.config_instance_spec
+`echo "88" >> #{@constants.progress_status}`
 @wakeup.start_vdc_webui
-`echo "80" >> #{@constants.progress_status}`
+`echo "90" >> #{@constants.progress_status}`
 
 `echo "# put shortcut of wakame on desktop" >> #{@constants.progress_status}`
 @wakeup.del_wake_wakame_vdc_launcher
+`echo "95" >> #{@constants.progress_status}`
 @wakeup.gen_webui_shortcut
 `echo "100" >> #{@constants.progress_status}`
 Process.waitall

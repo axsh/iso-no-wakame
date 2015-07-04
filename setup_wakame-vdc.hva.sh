@@ -45,8 +45,12 @@ if [[ -z "${etcd_host}" ]]; then
 else
   echo "AMQP_ADDR=${etcd_host}" >> /etc/default/vdc-hva
   echo "AMQP_PORT=5672" >> /etc/default/vdc-hva
-  echo "/usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/node${node_id} \"${ip}\""
-  /usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/node${node_id} "${ip}"
+  #echo "/usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/node${node_id} \"${ip}\""
+  #/usr/local/bin/etcdctl --peers http://${etcd_host}:${etcd_port} set hva/hosts/node${node_id} "${ip}"
+  echo "curl -L http://${etcd_host}:${etcd_port}/v2/keys/hva/hosts/node${node_id} -X PUT -d value=\"${ip}\""
+  /usr/bin/curl -L http://${etcd_host}:${etcd_port}/v2/keys/hva/hosts/node${node_id} -X PUT -d value="${ip}"
+  sleep 60
+  sudo /sbin/start vdc-hva >> /var/log/wakame-vdc.hva.node.log 2>&1
 fi
 
 

@@ -226,7 +226,7 @@ wakame-vdc-webui-vmapp-config
 
 cp -a /etc/resolv.conf /etc/resolv.conf.orig
 echo "nameserver 192.168.122.1" >> /etc/resolv.conf
-echo "Wakame-VDC LiveDVD release 15.03 (RC2)" > /etc/redhat-release
+echo "Wakame-VDC LiveDVD release 15.03 (FINAL)" > /etc/redhat-release
 
 LIVE_USER="wakame"
 
@@ -309,6 +309,17 @@ done
 cp splash.jpg ${INSTALL_ROOT}/../iso-*/isolinux/
 sed -i -e "s/ffffffff/ff00cc00/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
 sed -i -e "s/ff000000/ff008800/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
+cat >> ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg << EOF_isolinux
+label linux0
+  menu label Manual_1box
+  kernel vmlinuz0
+  append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=manual_1box
+label linux0
+  menu label Manual_boxes
+  kernel vmlinuz0
+  append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=manual_boxes
+EOF_isolinux
+
 
 mkdir -p ${INSTALL_ROOT}/tftpboot/{pxelinux.cfg,iso}
 cp splash.jpg ${INSTALL_ROOT}/tftpboot/
@@ -322,9 +333,15 @@ chmod +x ${INSTALL_ROOT}/usr/local/bin/etcd
 chmod +x ${INSTALL_ROOT}/usr/local/bin/etcdctl
 chmod +x ${INSTALL_ROOT}/usr/local/bin/stone
 cat >> ${INSTALL_ROOT}/etc/rc.local << EOF_rclocal
-[[ `grep etcd_host /proc/cmdline | wc -l` -eq 0 ]] && sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
+[[ \`grep etcd_host /proc/cmdline | wc -l\` -eq 0 ]] && sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
 sudo /usr/local/bin/etcd -listen-client-urls=http://0.0.0.0:4001 -listen-peer-urls=http://0.0.0.0:7001 > /var/log/etcd.log 2>&1 &
-sudo /usr/local/bin/wake-wakame-vdc auto_1box >> /var/log/wakame-vdc.livedvd.log 2>&1
+if [[ 1 -eq \`grep manual_1box /proc/cmdline | wc -l\` ]]; then
+   cp /opt/axsh/wakame-vdc/demo.data/manual_1box_launcher /home/wakame/Desktop/WakeWakameVDC.desktop
+elif [[ 1 -eq \`grep manual_boxes /proc/cmdline | wc -l\` ]]; then
+   cp /opt/axsh/wakame-vdc/demo.data/manual_boxes_launcher /home/wakame/Desktop/WakeWakameVDC.desktop
+else;
+   sudo /usr/local/bin/wake-wakame-vdc auto_1box >> /var/log/wakame-vdc.livedvd.log 2>&1
+fi
 EOF_rclocal
 
 #cp -a ./gems/gems/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/gems/
@@ -337,6 +354,8 @@ cp -a ./pri.pem ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 chmod 400 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/pri.pem
 cp -a ./pub.pem ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 chmod 400 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/pub.pem
+cp -a ./manual_1box_launcher ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
+cp -a ./manual_boxes_launcher ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 
 mv ${INSTALL_ROOT}/etc/resolv.conf.orig ${INSTALL_ROOT}/etc/resolv.conf
 
