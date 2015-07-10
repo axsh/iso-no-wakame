@@ -4,9 +4,9 @@
   <property name="backdrop" type="empty">
     <property name="screen0" type="empty">
       <property name="monitor0" type="empty">
-        <property name="image-path" type="string" value="/usr/share/xfce4/backdrops/xfce-in-the-moon.png"/>
+        <property name="image-path" type="string" value="/opt/axsh/wakame-vdc/WakameLiveDVDBackground-1024x768.png"/>
         <property name="last-image" type="string" value="/usr/share/backgrounds/images/default.png"/>
-        <property name="last-single-image" type="string" value="/usr/share/xfce4/backdrops/xfce-in-the-moon.png"/>
+        <property name="last-single-image" type="string" value="/opt/axsh/wakame-vdc/WakameLiveDVDBackground-1024x768.png"/>
       </property>
     </property>
   </property>

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=WakeWakameVDC
+Comment=
+Exec=sudo /usr/local/bin/wake-wakame-vdc auto_boxes
+Icon=/usr/share/icons/gnome/48x48/apps/wakamevdc-logo.png
+Path=
+Terminal=false
+StartupNotify=false
+GenericName=

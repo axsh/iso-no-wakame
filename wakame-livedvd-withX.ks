@@ -22,7 +22,7 @@ repo --name=wakame3rd   --baseurl=http://dlc.wakame.axsh.jp/packages/3rd/rhel/6/
 
 ### begin withX
 xconfig --startxonboot
-part / --size 6144 --fstype ext4
+#part / --size 6144 --fstype ext4
 ### end withX
 
 services --disabled=NetworkManager,network,sshd
@@ -226,7 +226,7 @@ wakame-vdc-webui-vmapp-config
 
 cp -a /etc/resolv.conf /etc/resolv.conf.orig
 echo "nameserver 192.168.122.1" >> /etc/resolv.conf
-echo "Wakame-VDC LiveDVD release 15.03 (FINAL)" > /etc/redhat-release
+echo "Wakame-VDC LiveDVD release 15.07 (FINAL)" > /etc/redhat-release
 
 LIVE_USER="wakame"
 
@@ -268,6 +268,7 @@ EOF_sysconfig_desktop
 /opt/axsh/wakame-vdc/ruby/bin/gem install etcd
 /opt/axsh/wakame-vdc/ruby/bin/gem install mixlib-log
 /opt/axsh/wakame-vdc/ruby/bin/gem install rdialog
+/opt/axsh/wakame-vdc/ruby/bin/gem install net-dhcp
 #/opt/axsh/wakame-vdc/ruby/bin/gem install Zenity.rb
 
 EOF_post
@@ -285,7 +286,9 @@ cat > /root/postnochroot-install << EOF_postnochroot
 cp -r ./rpms ${INSTALL_ROOT}/tmp/
 /usr/sbin/chroot ${INSTALL_ROOT}/ /bin/rpm -Uvh --nodeps --force /tmp/rpms/kmod-openvswitch-2.3.0-1.el6.x86_64.rpm /tmp/rpms/openvswitch-2.3.0-1.x86_64.rpm
 /usr/sbin/chroot ${INSTALL_ROOT}/ /bin/rpm -Uvh --nodeps --force /tmp/rpms/plymouth-0.8.3-27.el6.1.x86_64.rpm /tmp/rpms/plymouth-core-libs-0.8.3-27.el6.1.x86_64.rpm
-
+cp -a ./WakameLiveDVDBackground-1024x768.png ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
+chown root. ${INSTALL_ROOT}/opt/axsh/wakame-vdc/WakameLiveDVDBackground-1024x768.png
+chmod 644 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/WakameLiveDVDBackground-1024x768.png
 cp -a ./setup_wakame-vdc.sh ${INSTALL_ROOT}/usr/local/bin/
 chmod +x ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.sh
 cp -a ./setup_wakame-vdc.hva.sh ${INSTALL_ROOT}/usr/local/bin/
@@ -297,12 +300,13 @@ chmod +x ${INSTALL_ROOT}/usr/local/bin/zenity-progress-conditioner.rb
 
 mkdir -p ${INSTALL_ROOT}/var/lib/wakame-vdc/images
 cp -a ./ubuntu-lucid-kvm-md-32.raw.gz ${INSTALL_ROOT}/var/lib/wakame-vdc/images/
+sed -i 's/512\*1024/512\*1024\*4/' ${INSTALL_ROOT}/usr/share/dracut/modules.d/90dmsquash-live/dmsquash-live-root
 
 target=\`ls ${INSTALL_ROOT}/boot/|grep initramfs\`
 target_count=0
 for i in \$target; do
    target_version=\`echo \$i | sed -e "s|^initramfs-\\(.*\\).img$|\\1|"\`
-   /usr/sbin/chroot ${INSTALL_ROOT}/ /sbin/dracut -f /boot/\$i \$target_version
+   /usr/sbin/chroot ${INSTALL_ROOT}/ /sbin/dracut -f -I /sbin/busybox /boot/\$i \$target_version
    cp ${INSTALL_ROOT}/boot/\$i ${INSTALL_ROOT}/../iso-*/isolinux/initrd\${target_count}.img
    target_count=\$(( \$target_count + 1 ))
 done
@@ -318,6 +322,10 @@ label linux0
   menu label Manual_boxes
   kernel vmlinuz0
   append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=manual_boxes
+label linux0
+  menu label Auto_boxes
+  kernel vmlinuz0
+  append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=auto_boxes
 EOF_isolinux
 
 
@@ -333,13 +341,33 @@ chmod +x ${INSTALL_ROOT}/usr/local/bin/etcd
 chmod +x ${INSTALL_ROOT}/usr/local/bin/etcdctl
 chmod +x ${INSTALL_ROOT}/usr/local/bin/stone
 cat >> ${INSTALL_ROOT}/etc/rc.local << EOF_rclocal
-[[ \`grep etcd_host /proc/cmdline | wc -l\` -eq 0 ]] && sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
-sudo /usr/local/bin/etcd -listen-client-urls=http://0.0.0.0:4001 -listen-peer-urls=http://0.0.0.0:7001 > /var/log/etcd.log 2>&1 &
-if [[ 1 -eq \`grep manual_1box /proc/cmdline | wc -l\` ]]; then
+if [[ \\\`grep etcd_host /proc/cmdline | wc -l\\\` -eq 0 ]]; then
+   #sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
+   sudo dd if=/dev/sr0 of=/dev/shm/Wakame-VDC.LiveDVD.iso
+   cd /tftpboot/iso/
+   sudo /usr/bin/livecd-iso-to-pxeboot /dev/shm/Wakame-VDC.LiveDVD.iso
+   sudo rm -f /dev/shm/Wakame-VDC.LiveDVD.iso
+   cd /tftpboot/
+   ln -s /tftpboot/iso/tftpboot/vmlinuz0
+   ln -s /tftpboot/iso/tftpboot/initrd0.img
+   sudo /usr/local/bin/etcd -listen-client-urls=http://0.0.0.0:4001 -listen-peer-urls=http://0.0.0.0:7001 > /var/log/etcd.log 2>&1 &
+else
+   sudo mkdir -p /var/lib/dhclient/
+   sudo /usr/sbin/brctl addbr br0
+   sudo /usr/sbin/brctl addif br0 eth0
+   sudo /sbin/dhclient -1 -q -lf /var/lib/dhclient/dhclient-br0.leases -pf /var/run/dhclient-br0.pid br0 >> /var/log/wakame-vdc.livedvd.log 2>&1 &
+   sudo /sbin/ifconfig eth0 0.0.0.0 up >> /var/log/wakame-vdc.livedvd.log 2>&1 &
+   sleep 20
+   sudo /usr/local/bin/setup_wakame-vdc.hva.sh >> /var/log/wakame-vdc.livedvd.log 2>&1
+   exit 0
+fi
+if [[ 1 -eq \\\`grep manual_1box /proc/cmdline | wc -l\\\` ]]; then
    cp /opt/axsh/wakame-vdc/demo.data/manual_1box_launcher /home/wakame/Desktop/WakeWakameVDC.desktop
-elif [[ 1 -eq \`grep manual_boxes /proc/cmdline | wc -l\` ]]; then
+elif [[ 1 -eq \\\`grep manual_boxes /proc/cmdline | wc -l\\\` ]]; then
    cp /opt/axsh/wakame-vdc/demo.data/manual_boxes_launcher /home/wakame/Desktop/WakeWakameVDC.desktop
-else;
+elif [[ 1 -eq \\\`grep auto_boxes /proc/cmdline | wc -l\\\` ]]; then
+   cp /opt/axsh/wakame-vdc/demo.data/auto_boxes_launcher /home/wakame/Desktop/WakeWakameVDC.desktop
+else
    sudo /usr/local/bin/wake-wakame-vdc auto_1box >> /var/log/wakame-vdc.livedvd.log 2>&1
 fi
 EOF_rclocal
@@ -356,6 +384,7 @@ cp -a ./pub.pem ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 chmod 400 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/pub.pem
 cp -a ./manual_1box_launcher ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 cp -a ./manual_boxes_launcher ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
+cp -a ./auto_boxes_launcher ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 
 mv ${INSTALL_ROOT}/etc/resolv.conf.orig ${INSTALL_ROOT}/etc/resolv.conf
 

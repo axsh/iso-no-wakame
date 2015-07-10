@@ -2,6 +2,7 @@
 
 require 'pp'
 require 'fileutils'
+require 'logger'
 
 module FileUtils
   def self.sed_i(file, pattern, replacement)
@@ -186,6 +187,53 @@ module WakeWakameVdc
          else
             @dialog = WakeWakameVdc::UI::Dialog.new
          end
+         #FIXME
+         @cidrs = {
+            :rfc5737_1 => {:ip => '192.0.2.1', :prefix => 24,
+                  :nm => '255.255.255.0', :nw => '192.0.2.0',
+                  :dhcp_min => '192.0.2.10', :dhcp_max => '192.0.2.200',
+                  :hva_dhcp_min => '192.0.2.10', :hva_dhcp_max => '192.0.2.19',
+                  :vm_dhcp_min => '192.0.2.20', :vm_dhcp_max => '192.0.2.250',
+            },
+            :rfc5737_2 => {:ip => '198.51.100.1', :prefix => 24,
+                  :nm => '255.255.255.0', :nw => '198.51.100.0',
+                  :dhcp_min => '198.51.100.10', :dhcp_max => '198.51.100.200',
+                  :hva_dhcp_min => '198.51.100.10', :hva_dhcp_max => '198.51.100.19',
+                  :vm_dhcp_min => '198.51.100.20', :vm_dhcp_max => '198.51.100.250',
+            },
+            :rfc5737_3 => {:ip => '203.0.113.1', :prefix => 24,
+                  :nm => '255.255.255.0', :nw => '203.0.113.0',
+                  :dhcp_min => '203.0.113.10', :dhcp_max => '203.0.113.200',
+                  :hva_dhcp_min => '203.0.113.10', :hva_dhcp_max => '203.0.113.19',
+                  :vm_dhcp_min => '203.0.113.20', :vm_dhcp_max => '203.0.113.250',
+            },
+            :rfc1918_1 => {:ip => '10.0.0.1', :prefix => 8, 
+                  :nm => '255.0.0.0', :nw => '10.0.0.0', 
+                  :dhcp_min => '10.0.0.10', :dhcp_max => '10.0.0.200',
+                  :hva_dhcp_min => '10.0.0.10', :hva_dhcp_max => '10.0.0.19',
+                  :vm_dhcp_min => '10.0.0.20', :vm_dhcp_max => '10.0.0.250',
+            },
+            :rfc1918_2 => {:ip => '172.16.0.1', :prefix => 12,
+                  :nm => '255.240.0.0', :nw => '172.16.0.0',
+                  :dhcp_min => '172.16.0.10', :dhcp_max => '172.16.0.200',
+                  :hva_dhcp_min => '172.16.0.10', :hva_dhcp_max => '172.16.0.19',
+                  :vm_dhcp_min => '172.16.0.20', :vm_dhcp_max => '172.16.0.250',
+            },
+            :rfc1918_3 => {:ip => '192.168.0.1', :prefix => 16,
+                  :nm => '255.255.0.0', :nw => '192.168.0.0',
+                  :dhcp_min => '192.168.0.10', :dhcp_max => '192.168.0.200',
+                  :hva_dhcp_min => '192.168.0.10', :hva_dhcp_max => '192.168.0.19',
+                  :vm_dhcp_min => '192.168.0.20', :vm_dhcp_max => '192.168.0.250',
+            }
+         }
+         @log = Logger.new('/var/log/wake-wakame-vdc.log')
+         @log.level = Logger::DEBUG
+      end
+
+      def list_interfaces_centos
+         nics = `ls -1 /sys/class/net/`.split("\n")
+         nics.delete('lo')
+         return nics
       end
 
       def list_linked_interfaces_centos
@@ -210,6 +258,12 @@ module WakeWakameVdc
       end
 
       def make_network_interface_centos(ip: '169.254.1.1', nm: '255.255.255.255', gw: nil, device: 'eth0', dhcp: false, ether_type: 'Ethernet')
+         @log.debug("make_network_interface_centos() ip: #{ip}")
+         @log.debug("make_network_interface_centos() nm: #{nm}")
+         @log.debug("make_network_interface_centos() gw: #{gw}")
+         @log.debug("make_network_interface_centos() device: #{device}")
+         @log.debug("make_network_interface_centos() dhcp: #{dhcp}")
+         @log.debug("make_network_interface_centos() ether_type: #{ether_type}")
          File.open("#{@constants.network_conf}ifcfg-#{device}", 'w') do |file|
             file.puts(<<"EOF")
 DEVICE="#{device}"
@@ -230,17 +284,29 @@ EOF
          end
       end
 
-      def make_bridge_and_attach_physical_interface_centos(ip: '169.254.1.1', nm: '255.255.255.255', gw: nil, physical: 'eth0', bridge: 'br0')
+      def make_bridge_and_attach_physical_interface_centos(ip: '169.254.1.1', nm: '255.255.255.255', gw: nil, physical: 'eth0', bridge: 'br0', dhcp: false)
+         @log.debug("make_bridge_and_attach_physical_interface_centos() ip: #{ip}")
+         @log.debug("make_bridge_and_attach_physical_interface_centos() nm: #{nm}")
+         @log.debug("make_bridge_and_attach_physical_interface_centos() gw: #{gw}")
+         @log.debug("make_bridge_and_attach_physical_interface_centos() physical: #{physical}")
+         @log.debug("make_bridge_and_attach_physical_interface_centos() dhcp: #{dhcp}")
+         @log.debug("make_bridge_and_attach_physical_interface_centos() bridge: #{bridge}")
          File.open("#{@constants.network_conf}ifcfg-#{bridge}", 'w') do |file|
             file.puts(<<"EOF")
 DEVICE="#{bridge}"
-BOOTPROTO="static"
 NM_CONTROLLED="no"
 ONBOOT="yes"
 TYPE="Bridge"
+EOF
+            if dhcp
+               file.puts "BOOTPROTO=\"dhcp\""
+            else
+               file.puts(<<"EOF")
+BOOTPROTO="static"
 IPADDR="#{ip}"
 NETMASK="#{nm}"
 EOF
+            end
             file.puts "GATEWAY=\"#{gw}\"" if gw
          end
          File.open("#{@constants.network_conf}ifcfg-#{physical}", 'w') do |file|
@@ -253,33 +319,42 @@ EOF
          end
       end
 
-      def guess_unused_segment
-         #FIXME
-         cidrs = {
-            :a => {:ip => '10.0.0.1', :prefix => 8, 
-                  :nm => '255.0.0.0', :nw => '10.0.0.0', 
-                  :vm_dhcp_min => '10.0.0.10', :vm_dhcp_max => '10.0.0.200',
-            },
-            :b => {:ip => '172.16.0.1', :prefix => 12,
-                  :nm => '255.240.0.0', :nw => '172.16.0.0',
-                  :vm_dhcp_min => '172.16.0.10', :vm_dhcp_max => '172.16.0.200',
-            },
-            :c => {:ip => '192.168.0.1', :prefix => 16,
-                  :nm => '255.255.0.0', :nw => '192.168.0.0',
-                  :vm_dhcp_min => '192.168.0.10', :vm_dhcp_max => '192.168.0.200',
-            }
-         }
-         list_ip_addresses.each do |segment|
+      def dhcpoffer_centos(nic)
+         ip = nil
+         result = `/sbin/dhclient -1 -timeout 5 -v -lf /var/lib/dhclient/dhclient-#{nic}.leases -pf /var/run/dhclient-#{nic}.pid #{nic} 2>&1`
+         status = $?
+         @log.debug("dhcpoffer() result: #{result}")
+         @log.debug("dhcpoffer() status: #{status}")
+         @log.debug("dhcpoffer() exitstatus: #{status.exitstatus}")
+         if 0 == status.exitstatus
+            if result =~ /.*\nbound to ([0-9.]*) -- .*/
+               ip = $1
+               @log.debug("dhcpoffer() ip: #{ip}")
+            end
+            `/sbin/dhclient -r #{nic}`
+         end
+         return ip
+      end
+
+      def guess_unused_segment(ip_addresses = [])
+         ip_addresses = list_ip_addresses if 0 == ip_addresses.size
+         ip_addresses.each do |segment|
             case segment[:ip]
+            when /^192\.0\.2\./
+               @cidrs.delete(:rfc5737_1)
+            when /^198\.51\.100\./
+               @cidrs.delete(:rfc5737_2)
+            when /^203\.0\.113\./
+               @cidrs.delete(:rfc5737_3)
             when /^10\./
-               cidrs.delete(:a)
+               @cidrs.delete(:rfc1918_1)
             when /^172\.16\./
-               cidrs.delete(:b)
+               @cidrs.delete(:rfc1918_2)
             when /^192\.168\./
-               cidrs.delete(:c)
+               @cidrs.delete(:rfc1918_3)
             end
          end
-         return cidrs.to_a[0][1]
+         return @cidrs
       end
 
       def network_restart_centos
@@ -287,9 +362,9 @@ EOF
          `/etc/init.d/sshd restart`
       end
 
-      def boot_dnsmasq_centos
-         `echo "/usr/sbin/dnsmasq --dhcp-range=#{@config[:hva, :dhcp_min]},#{@config[:hva, :dhcp_max]} --dhcp-boot=pxelinux.0 --enable-tftp --tftp-root=/tftpboot --interface=br0" >> /var/log/wakame-vdc.livedvd.log`
-         result = `/usr/sbin/dnsmasq --dhcp-range=#{@config[:hva, :dhcp_min]},#{@config[:hva, :dhcp_max]} --dhcp-boot=pxelinux.0 --enable-tftp --tftp-root=/tftpboot --interface=br0`
+      def boot_dnsmasq_centos(nic: 'br0')
+         `echo "/usr/sbin/dnsmasq --dhcp-range=#{@config[:hva, :dhcp_min]},#{@config[:hva, :dhcp_max]} --dhcp-boot=pxelinux.0 --enable-tftp --tftp-root=/tftpboot --interface=#{nic}" >> /var/log/wakame-vdc.livedvd.log`
+         result = `/usr/sbin/dnsmasq --dhcp-range=#{@config[:hva, :dhcp_min]},#{@config[:hva, :dhcp_max]} --dhcp-boot=pxelinux.0 --enable-tftp --tftp-root=/tftpboot --interface=#{nic}`
       end
 
       def terminate_dnsmasq_centos
@@ -608,12 +683,107 @@ def auto_1box
    @network.make_network_interface(device: nic, dhcp: true)
    @network.network_restart
    if 0 < @network.list_ip_addresses.size
-      @inner_net = @network.guess_unused_segment
+      @inner_net = @network.guess_unused_segment.to_a[0][1]
       @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'br0', ether_type: 'Bridge')
       @network.network_restart
       result = true
    end
    return result
+end
+
+def auto_boxes
+   result = false
+   nics = @network.list_interfaces
+   pp "auto_boxes() nics: #{nics}"
+   dhcp_nics = []
+   nics.delete_if do |nic|
+      pp "auto_boxes() nic: #{nic}"
+      ip = @network.dhcpoffer(nic)
+      pp "auto_boxes() ip: #{ip}"
+      if ip
+         @network.guess_unused_segment([{:ip => ip}])
+         dhcp_nics << nic
+      end
+   end
+   return auto_1box if 0 == nics.size
+   @config[:global, :hypervisor] = 'KVM'
+   pp "auto_boxes() dhcp_nics.size: #{dhcp_nics.size}"
+   pp "auto_boxes() dhcp_nics: #{dhcp_nics}"
+   if 0 < dhcp_nics.size
+      dhcp_nics.each do |nic| 
+         pp "auto_boxes() nic: #{nic}"
+         #@network.make_network_interface(device: nic, dhcp: true)
+         @network.make_bridge_and_attach_physical_interface(physical: nic, bridge: nic.gsub(/eth/, 'br'), dhcp: true)
+      end
+   else
+      dcmgr_net = @network.guess_unused_segment.to_a[0][1]
+      @config[:dcmgr, :host_ip] = dcmgr_net[:ip]
+      @config[:dcmgr, :host_nm] = dcmgr_net[:nm]
+      @config[:hva, :dhcp_min] = dcmgr_net[:hva_dhcp_min]
+      @config[:hva, :dhcp_max] = dcmgr_net[:hva_dhcp_max]
+      @config[:vm, :dhcp_min] = dcmgr_net[:vm_dhcp_min]
+      @config[:vm, :dhcp_max] = dcmgr_net[:vm_dhcp_max]
+      nic = nics.shift
+      @network.make_bridge_and_attach_physical_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], physical: nic, bridge: nic.gsub(/eth/, 'br'))
+   end
+   @network.network_restart
+
+   @config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
+   if 'Type 1' == @config[:global, :structure]
+      `echo "" > #{@constants.progress_status}`
+      fork do
+         @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+      end
+      `echo "10" >> #{@constants.progress_status}`
+      if 0 < @network.list_ip_addresses.size
+         @inner_net = @network.guess_unused_segment.to_a[0][1]
+         @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'bridge0', ether_type: 'Bridge')
+         @network.network_restart
+         result = true
+      end
+      `echo "20" >> #{@constants.progress_status}`
+      return result
+   elsif 'Type 2' == @config[:global, :structure]
+      if 0 < dhcp_nics.size
+         hva_net = @network.guess_unused_segment.to_a[0][1]
+         @config[:dcmgr, :host_ip] = hva_net[:ip]
+         @config[:dcmgr, :host_nm] = hva_net[:nm]
+         @config[:hva, :dhcp_min] = hva_net[:hva_dhcp_min]
+         @config[:hva, :dhcp_max] = hva_net[:hva_dhcp_max]
+         @config[:vm, :dhcp_min] = hva_net[:vm_dhcp_min]
+         @config[:vm, :dhcp_max] = hva_net[:vm_dhcp_max]
+         nic = nics.shift
+         @network.make_bridge_and_attach_physical_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], physical: nic, bridge: nic.gsub(/eth/, 'br'))
+         @network.network_restart
+         @network.create_pxe_cfg
+         @network.boot_dnsmasq(nic: nic.gsub(/eth/, 'br'))
+         yesno = false
+         until yesno do
+            @dialog.msgbox(@constants.messages[:poweron])
+            hva_hosts = @config.retrieve_hva_hosts
+            next unless hva_hosts
+            hva_hosts_list = hva_hosts.join("\n")
+            @dialog.msgbox(@constants.messages[:hva_hosts] + "\n" + hva_hosts_list, escape: true)
+            yesno = @dialog.msgbox(@constants.messages[:hva_confirm])
+         end
+         exit unless yesno
+      end
+   end
+   @network.terminate_dnsmasq
+   subnet = @network.subnetcalc(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm])
+   @inner_net = {}
+   @inner_net[:ip] = @config[:dcmgr, :host_ip]
+   @inner_net[:nw] = subnet[:nw_address]
+   @inner_net[:prefix] = subnet[:nw_prefix]
+   @inner_net[:vm_dhcp_min] = @config[:vm, :dhcp_min]
+   @inner_net[:vm_dhcp_max] = @config[:vm, :dhcp_max]
+   `echo "" > #{@constants.progress_status}`
+   fork do
+      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+   end
+   `echo "10" >> #{@constants.progress_status}`
+   `echo "20" >> #{@constants.progress_status}`
+   return yesno
 end
 
 def manual_1box
@@ -644,7 +814,7 @@ EOL
    @network.network_restart
    `echo "10" >> #{@constants.progress_status}`
    if 0 < @network.list_ip_addresses.size
-      @inner_net = @network.guess_unused_segment
+      @inner_net = @network.guess_unused_segment.to_a[0][1]
       @network.make_network_interface(ip: @inner_net[:ip], nm: @inner_net[:nm], device: 'br0', ether_type: 'Bridge')
       @network.network_restart
       result = true
@@ -727,7 +897,10 @@ end
 #result = auto_1box if :auto_1box == mode
 #result = manual_1box if  :manual_1box == mode or false == result
 #manual_1box unless auto_1box
-if 'auto_1box' == ARGV[0]
+if 'auto_boxes' == ARGV[0]
+   unless auto_boxes
+   end
+elsif 'auto_1box' == ARGV[0]
    unless auto_1box
       @wakeup.gen_wake_wakame_vdc_launcher
       puts "was not able to auto start"
@@ -755,6 +928,11 @@ end
 `echo "# invoke setup_wakame-vdc.sh" >> #{@constants.progress_status}`
 #nw = network.subnetcalc(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm])
 puts "-------------------- setup_wakame-vdc.sh -------------------"
+puts "IP=#{@inner_net[:ip]}"
+puts "NETWORK=#{@inner_net[:nw]}"
+puts "PREFIX=#{@inner_net[:prefix]}"
+puts "DHCP_RANGE_START=#{@inner_net[:vm_dhcp_min]}"
+puts "DHCP_RANGE_END=#{@inner_net[:vm_dhcp_max]}"
 result = `IP="#{@inner_net[:ip]}" \
  NETWORK="#{@inner_net[:nw]}" \
  PREFIX="#{@inner_net[:prefix]}" \
@@ -807,62 +985,3 @@ sleep 5
 `echo "100" >> #{@constants.progress_status}`
 Process.waitall
 
-=begin
-config[:global, :structure] = dialog.radiolist(constants.messages[:structure], rows: constants.structures, escape: true)
-config[:global, :hypervisor] = dialog.radiolist(constants.messages[:hypervisor], rows: constants.hypervisors, escape: true)
-config[:dcmgr, :host_ip] = dialog.inputbox(constants.messages[:host_ip], escape: true)
-config[:dcmgr, :host_nm] = dialog.inputbox(constants.messages[:host_nm], escape: true)
-config[:dcmgr, :host_gw] = dialog.inputbox(constants.messages[:host_gw], escape: true)
-config[:vm, :dhcp_min] = dialog.inputbox(constants.messages[:vm_dhcp_min], escape: true)
-config[:vm, :dhcp_max] = dialog.inputbox(constants.messages[:vm_dhcp_max], escape: true)
-
-confirm = <<"EOL"
-Structure: #{config[:global, :structure]}
-Hypervisor: #{config[:global, :hypervisor]}
-eth0's IP address: #{config[:dcmgr, :host_ip]}
-eth0's Subnet Mask: #{config[:dcmgr, :host_nm]}
-eth0's Gateway address: #{config[:dcmgr, :host_gw]}
-dhcp range for Instances: #{config[:vm, :dhcp_min]} - #{config[:vm, :dhcp_max]}
-EOL
-
-if 'Type 2' == config[:global, :structure]
-   config[:hva, :dhcp_min] = dialog.inputbox(constants.messages[:hva_dhcp_min], escape: true)
-   config[:hva, :dhcp_max] = dialog.inputbox(constants.messages[:hva_dhcp_max], escape: true)
-   confirm += <<-"EOL"
-dhcp range for HVA nodes: #{config[:hva, :dhcp_min]} - #{config[:hva, :dhcp_max]}
-   EOL
-end
-
-dialog.msgbox(confirm, escape: true)
-
-network.make_bridge(ip: config[:dcmgr, :host_ip], nm: config[:dcmgr, :host_nm], gw: config[:dcmgr, :host_gw])
-network.network_restart
-
-if 'Type 2' == config[:global, :structure]
-   network.create_pxe_cfg
-   network.boot_dnsmasq
-   yesno = false
-   until yesno do
-      dialog.msgbox(constants.messages[:poweron])
-      hva_hosts = config.retrieve_hva_hosts
-      next unless hva_hosts
-      hva_hosts_list = hva_hosts.join("\n")
-      #hva_hosts.each do |hva_host|
-      # value into array
-      #end
-      dialog.msgbox(constants.messages[:hva_hosts] + "\n" + hva_hosts_list, escape: true)
-      yesno = dialog.msgbox(constants.messages[:hva_confirm])
-   end
-   exit unless yesno
-end
-
-network.terminate_dnsmasq
-
-case config[:global, :hypervisor]
-when 'LXC'
-   `/bin/sed -i -e "s/hypervisor kvm/hypervisor lxc/" /usr/local/bin/setup_wakame-vdc.sh`
-when 'OpenVZ'
-   `/bin/sed -i -e "s/hypervisor kvm/hypervisor openvz/" /usr/local/bin/setup_wakame-vdc.sh`
-end
-
-=end
