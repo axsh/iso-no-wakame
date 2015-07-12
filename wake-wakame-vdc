@@ -693,6 +693,10 @@ end
 
 def auto_boxes
    result = false
+   `echo "" > #{@constants.progress_status}`
+   fork do
+      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+   end
    nics = @network.list_interfaces
    pp "auto_boxes() nics: #{nics}"
    dhcp_nics = []
@@ -730,10 +734,6 @@ def auto_boxes
 
    @config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
    if 'Type 1' == @config[:global, :structure]
-      `echo "" > #{@constants.progress_status}`
-      fork do
-         @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
-      end
       `echo "10" >> #{@constants.progress_status}`
       if 0 < @network.list_ip_addresses.size
          @inner_net = @network.guess_unused_segment.to_a[0][1]
@@ -777,10 +777,6 @@ def auto_boxes
    @inner_net[:prefix] = subnet[:nw_prefix]
    @inner_net[:vm_dhcp_min] = @config[:vm, :dhcp_min]
    @inner_net[:vm_dhcp_max] = @config[:vm, :dhcp_max]
-   `echo "" > #{@constants.progress_status}`
-   fork do
-      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
-   end
    `echo "10" >> #{@constants.progress_status}`
    `echo "20" >> #{@constants.progress_status}`
    return yesno
@@ -943,6 +939,8 @@ result = `IP="#{@inner_net[:ip]}" \
 `echo "40" >> #{@constants.progress_status}`
 pp result
 
+@config[:hva, :boot] = "wait"
+
 unless 'Type 2' == @config[:global, :structure]
 `echo "# invoke setup_wakame-vdc.hva.sh" >> #{@constants.progress_status}`
 puts "-------------------- setup_wakame-vdc.hva.sh -------------------"
@@ -970,6 +968,8 @@ end
 `echo "76" >> #{@constants.progress_status}`
 @wakeup.start_vdc_collector
 `echo "80" >> #{@constants.progress_status}`
+sleep 10
+@config[:hva, :boot] = "go ahead"
 @wakeup.start_vdc_hva unless 'Type 2' == @config[:global, :structure]
 `echo "84" >> #{@constants.progress_status}`
 sleep 5

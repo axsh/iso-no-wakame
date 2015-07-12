@@ -259,7 +259,11 @@ DESKTOP=XFCE
 DISPLAYMANAGER=GNOME
 EOF_sysconfig_desktop
 
-
+cat /etc/rabbitmq/rabbitmq.config << EOF_rabbitmq_config
+[
+  {rabbit, [{disk_free_limit, 200000000}]}
+].
+EOF_rabbitmq_config
 
 
 
@@ -289,10 +293,14 @@ cp -r ./rpms ${INSTALL_ROOT}/tmp/
 cp -a ./WakameLiveDVDBackground-1024x768.png ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
 chown root. ${INSTALL_ROOT}/opt/axsh/wakame-vdc/WakameLiveDVDBackground-1024x768.png
 chmod 644 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/WakameLiveDVDBackground-1024x768.png
+cp -a ./wallpaper4-3_A.png ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
+cp -a ./wallpaper4-3_B.png ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
 cp -a ./setup_wakame-vdc.sh ${INSTALL_ROOT}/usr/local/bin/
-chmod +x ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.sh
+chown root. ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.sh
+chmod 755 ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.sh
 cp -a ./setup_wakame-vdc.hva.sh ${INSTALL_ROOT}/usr/local/bin/
-chmod +x ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.hva.sh
+chown root. ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.hva.sh
+chmod 755 ${INSTALL_ROOT}/usr/local/bin/setup_wakame-vdc.hva.sh
 cp -a ./wake-wakame-vdc ${INSTALL_ROOT}/usr/local/bin/
 chmod +x ${INSTALL_ROOT}/usr/local/bin/wake-wakame-vdc
 cp -a ./zenity-progress-conditioner.rb ${INSTALL_ROOT}/usr/local/bin/
@@ -315,6 +323,10 @@ sed -i -e "s/ffffffff/ff00cc00/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
 sed -i -e "s/ff000000/ff008800/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
 cat >> ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg << EOF_isolinux
 label linux0
+  menu label Auto_boxes
+  kernel vmlinuz0
+  append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=auto_boxes
+label linux0
   menu label Manual_1box
   kernel vmlinuz0
   append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=manual_1box
@@ -322,10 +334,6 @@ label linux0
   menu label Manual_boxes
   kernel vmlinuz0
   append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=manual_boxes
-label linux0
-  menu label Auto_boxes
-  kernel vmlinuz0
-  append initrd=initrd0.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM mode=auto_boxes
 EOF_isolinux
 
 
@@ -342,14 +350,17 @@ chmod +x ${INSTALL_ROOT}/usr/local/bin/etcdctl
 chmod +x ${INSTALL_ROOT}/usr/local/bin/stone
 cat >> ${INSTALL_ROOT}/etc/rc.local << EOF_rclocal
 if [[ \\\`grep etcd_host /proc/cmdline | wc -l\\\` -eq 0 ]]; then
-   #sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
-   sudo dd if=/dev/sr0 of=/dev/shm/Wakame-VDC.LiveDVD.iso
-   cd /tftpboot/iso/
-   sudo /usr/bin/livecd-iso-to-pxeboot /dev/shm/Wakame-VDC.LiveDVD.iso
-   sudo rm -f /dev/shm/Wakame-VDC.LiveDVD.iso
-   cd /tftpboot/
-   ln -s /tftpboot/iso/tftpboot/vmlinuz0
-   ln -s /tftpboot/iso/tftpboot/initrd0.img
+   if [[ \\\`grep boxes /proc/cmdline | wc -l\\\` -ne 0 ]]; then
+      #sudo /bin/mount -o ro /dev/disk/by-label/Wakame-VDC.LiveDVD /tftpboot/iso/
+      #sudo dd if=/dev/sr0 of=/dev/shm/Wakame-VDC.LiveDVD.iso
+      sudo dd if=/dev/sr0 of=/tmp/Wakame-VDC.LiveDVD.iso
+      cd /dev/shm/
+      sudo /usr/bin/livecd-iso-to-pxeboot /tmp/Wakame-VDC.LiveDVD.iso
+      sudo rm -f /tmp/Wakame-VDC.LiveDVD.iso
+      cd /tftpboot/
+      ln -s /dev/shm/tftpboot/vmlinuz0
+      ln -s /dev/shm/tftpboot/initrd0.img
+   fi
    sudo /usr/local/bin/etcd -listen-client-urls=http://0.0.0.0:4001 -listen-peer-urls=http://0.0.0.0:7001 > /var/log/etcd.log 2>&1 &
 else
    sudo mkdir -p /var/lib/dhclient/
@@ -358,7 +369,7 @@ else
    sudo /sbin/dhclient -1 -q -lf /var/lib/dhclient/dhclient-br0.leases -pf /var/run/dhclient-br0.pid br0 >> /var/log/wakame-vdc.livedvd.log 2>&1 &
    sudo /sbin/ifconfig eth0 0.0.0.0 up >> /var/log/wakame-vdc.livedvd.log 2>&1 &
    sleep 20
-   sudo /usr/local/bin/setup_wakame-vdc.hva.sh >> /var/log/wakame-vdc.livedvd.log 2>&1
+   sudo /usr/local/bin/setup_wakame-vdc.hva.sh >> /var/log/wakame-vdc.livedvd.log 2>&1 &
    exit 0
 fi
 if [[ 1 -eq \\\`grep manual_1box /proc/cmdline | wc -l\\\` ]]; then
