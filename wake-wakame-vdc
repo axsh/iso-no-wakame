@@ -384,14 +384,14 @@ menu background splash.jpg
 menu vshift 10
 menu width 80
 timeout 10
-menu title Wakame-VDC LiveDVD
+menu title Wakame-vdc LiveDVD
 label pxeboot
-	menu label Wakame-VDC HVA
+	menu label Wakame-vdc HVA
 #	kernel iso/isolinux/vmlinuz0
         KERNEL vmlinuz0
-	APPEND rootflags=loop initrd=initrd0.img root=live:/Wakame-VDC.LiveDVD.iso rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM ip=dhcp etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001 3
-#	APPEND rootflags=loop initrd=initrd0.img root=live:/Wakame-VDC.LiveDVD.iso rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM
-#	append initrd=iso/isolinux/initrd0.img fetch=tftp://#{@config[:dcmgr, :host_ip]}/iso/LiveOS/squashfs.img root=live:CDLABEL=Wakame-VDC.LiveDVD rootfstype=auto ip=dhcp ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001
+	APPEND rootflags=loop initrd=initrd0.img root=live:/Wakame-vdc.LiveDVD.iso rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM ip=dhcp etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001 3
+#	APPEND rootflags=loop initrd=initrd0.img root=live:/Wakame-vdc.LiveDVD.iso rootfstype=auto ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM
+#	append initrd=iso/isolinux/initrd0.img fetch=tftp://#{@config[:dcmgr, :host_ip]}/iso/LiveOS/squashfs.img root=live:CDLABEL=Wakame-vdc.LiveDVD rootfstype=auto ip=dhcp ro liveimg quiet  rhgb rd_NO_LUKS rd_NO_MD rd_NO_DM etcd_host=#{@config[:dcmgr, :host_ip]} etcd_port=4001
 onerror localboot -1
          EOF
          File.open("/tftpboot/pxelinux.cfg/default", 'w') do |file|
@@ -569,16 +569,16 @@ EOF
       end
 
       def del_wake_wakame_vdc_launcher(home: '/home/wakame')
-         FileUtils.rm_f([home, 'Desktop/WakeWakameVDC.desktop'].join('/'))
+         FileUtils.rm_f([home, 'Desktop/WakeWakamevdc.desktop'].join('/'))
       end
 
       def gen_wake_wakame_vdc_launcher(home: '/home/wakame')
-         File.open([home, 'Desktop/WakeWakameVDC.desktop'].join('/'), 'w') do |file|
+         File.open([home, 'Desktop/WakeWakamevdc.desktop'].join('/'), 'w') do |file|
             file.puts(<<"EOF")
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=WakeWakameVDC
+Name=WakeWakamevdc
 Comment=
 Exec=sudo /usr/local/bin/wake-wakame-vdc manual_1box
 Icon=/usr/share/icons/gnome/48x48/apps/wakamevdc-logo.png
@@ -591,12 +591,12 @@ EOF
       end
 
       def gen_webui_shortcut(home: '/home/wakame')
-         File.open([home, 'Desktop/Wakame-VDC.WebUI.desktop'].join('/'), 'w') do |file|
+         File.open([home, 'Desktop/Wakame-vdc.WebUI.desktop'].join('/'), 'w') do |file|
             file.puts(<<"EOF")
 [Desktop Entry]
 Version=1.0
 Type=Link
-Name=Wakame-VDC WebUI
+Name=Wakame-vdc WebUI
 Comment=
 Icon=/usr/share/icons/gnome/48x48/apps/wakamevdc-logo.png
 URL=http://127.0.0.1:9000
@@ -631,7 +631,7 @@ EOF
          case lang
          when 'en'
             @messages = {
-               :structure => 'Please select structure of Wakame-VDC',
+               :structure => 'Please select structure of Wakame-vdc',
                :structure_type1 => 'All in one',
                :structure_type2 => 'A controller and some nodes',
                :hypervisor => 'What would you like to use as Hypervisor?',
@@ -695,7 +695,7 @@ def auto_boxes
    result = false
    `echo "" > #{@constants.progress_status}`
    fork do
-      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+      @dialog.progress('configure network', title: 'Wake Wakame-vdc', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
    end
    nics = @network.list_interfaces
    pp "auto_boxes() nics: #{nics}"
@@ -719,7 +719,9 @@ def auto_boxes
       dhcp_nics.each do |nic| 
          pp "auto_boxes() nic: #{nic}"
          #@network.make_network_interface(device: nic, dhcp: true)
-         @network.make_bridge_and_attach_physical_interface(physical: nic, bridge: nic.gsub(/eth/, 'br'), dhcp: true)
+         bridge = nic.gsub(/eth/, 'br')
+         @network.make_bridge_and_attach_physical_interface(physical: nic, bridge: bridge, dhcp: true)
+         `/sbin/iptables -t nat -A POSTROUTING -o #{bridge} -j MASQUERADE`
       end
    else
       dcmgr_net = @network.guess_unused_segment.to_a[0][1]
@@ -730,7 +732,9 @@ def auto_boxes
       @config[:vm, :dhcp_min] = dcmgr_net[:vm_dhcp_min]
       @config[:vm, :dhcp_max] = dcmgr_net[:vm_dhcp_max]
       nic = nics.shift
-      @network.make_bridge_and_attach_physical_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], physical: nic, bridge: nic.gsub(/eth/, 'br'))
+      bridge = nic.gsub(/eth/, 'br')
+      @network.make_bridge_and_attach_physical_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], physical: nic, bridge: bridge)
+      `/sbin/iptables -t nat -A POSTROUTING -o #{bridge} -j MASQUERADE`
    end
    `echo "6" >> #{@constants.progress_status}`
    @network.network_restart
@@ -768,7 +772,7 @@ def auto_boxes
             next unless hva_hosts
             hva_hosts_list = hva_hosts.join("\n")
             @dialog.msgbox(@constants.messages[:hva_hosts] + "\n" + hva_hosts_list, escape: true)
-            yesno = @dialog.msgbox(@constants.messages[:hva_confirm])
+            yesno = @dialog.yesno(@constants.messages[:hva_confirm])
          end
          exit unless yesno
       end
@@ -808,7 +812,7 @@ EOL
    @dialog.msgbox(confirm, escape: true)
    `echo "" > #{@constants.progress_status}`
    fork do
-      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+      @dialog.progress('configure network', title: 'Wake Wakame-vdc', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
    end
    @network.make_network_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], gw: @config[:dcmgr, :host_gw], device: nic, dhcp: false, ether_type: 'Ethernet')
    @network.network_restart
@@ -845,7 +849,7 @@ EOL
       @config[:hva, :dhcp_min] = @dialog.inputbox(@constants.messages[:hva_dhcp_min], escape: true)
       @config[:hva, :dhcp_max] = @dialog.inputbox(@constants.messages[:hva_dhcp_max], escape: true)
       confirm += <<-"EOL"
-dhcp range for Wakame-VDC HVA nodes: #{@config[:hva, :dhcp_min]} - #{@config[:hva, :dhcp_max]}
+dhcp range for Wakame-vdc HVA nodes: #{@config[:hva, :dhcp_min]} - #{@config[:hva, :dhcp_max]}
       EOL
    end
 
@@ -876,7 +880,7 @@ dhcp range for Wakame-VDC HVA nodes: #{@config[:hva, :dhcp_min]} - #{@config[:hv
    @inner_net[:vm_dhcp_max] = @config[:vm, :dhcp_max]
    `echo "" > #{@constants.progress_status}`
    fork do
-      @dialog.progress('configure network', title: 'Wake Wakame-VDC', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
+      @dialog.progress('configure network', title: 'Wake Wakame-vdc', cmd: "/usr/local/bin/zenity-progress-conditioner.rb #{@constants.progress_status}")
    end
    `echo "10" >> #{@constants.progress_status}`
    `echo "20" >> #{@constants.progress_status}`
@@ -986,6 +990,10 @@ sleep 5
 @wakeup.del_wake_wakame_vdc_launcher
 `echo "95" >> #{@constants.progress_status}`
 @wakeup.gen_webui_shortcut
+unless 'Type 2' == @config[:global, :structure]
+   gw_nic = `/sbin/route -n | /bin/grep ^0.0.0.0 | /bin/awk '{print $8}'`.chomp
+   `/sbin/iptables -t nat -A POSTROUTING -o #{gw_nic} -j MASQUERADE`
+end
 `echo "100" >> #{@constants.progress_status}`
 Process.waitall
 

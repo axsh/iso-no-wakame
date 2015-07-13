@@ -185,6 +185,7 @@ grep -v '\s*#' <<CMDSET | /opt/axsh/wakame-vdc/dcmgr/bin/vdc-manage -e
   --rule=$data_path/sg-demofgr.rule
 CMDSET
 
+echo 1 > /proc/sys/net/ipv4/ip_forward
 
 # add newline
 echo

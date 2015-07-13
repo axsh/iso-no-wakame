@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=WakeWakameVDC
+Name=WakeWakamevdc
 Comment=
 Exec=sudo /usr/local/bin/wake-wakame-vdc manual_1box
 Icon=/usr/share/icons/gnome/48x48/apps/wakamevdc-logo.png
