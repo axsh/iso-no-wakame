@@ -362,6 +362,7 @@ if [[ \\\`grep etcd_host /proc/cmdline | wc -l\\\` -eq 0 ]]; then
       ln -s /dev/shm/tftpboot/initrd0.img
    fi
    sudo /usr/local/bin/etcd -listen-client-urls=http://0.0.0.0:4001 -listen-peer-urls=http://0.0.0.0:7001 > /var/log/etcd.log 2>&1 &
+   sudo echo 1 > /proc/sys/net/ipv4/ip_forward
 else
    sudo mkdir -p /var/lib/dhclient/
    sudo /usr/sbin/brctl addbr br0

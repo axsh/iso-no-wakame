@@ -700,6 +700,7 @@ def auto_boxes
    nics = @network.list_interfaces
    pp "auto_boxes() nics: #{nics}"
    dhcp_nics = []
+   `echo "2" >> #{@constants.progress_status}`
    nics.delete_if do |nic|
       pp "auto_boxes() nic: #{nic}"
       ip = @network.dhcpoffer(nic)
@@ -709,6 +710,7 @@ def auto_boxes
          dhcp_nics << nic
       end
    end
+   `echo "4" >> #{@constants.progress_status}`
    return auto_1box if 0 == nics.size
    @config[:global, :hypervisor] = 'KVM'
    pp "auto_boxes() dhcp_nics.size: #{dhcp_nics.size}"
@@ -730,7 +732,9 @@ def auto_boxes
       nic = nics.shift
       @network.make_bridge_and_attach_physical_interface(ip: @config[:dcmgr, :host_ip], nm: @config[:dcmgr, :host_nm], physical: nic, bridge: nic.gsub(/eth/, 'br'))
    end
+   `echo "6" >> #{@constants.progress_status}`
    @network.network_restart
+   `echo "8" >> #{@constants.progress_status}`
 
    @config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
    if 'Type 1' == @config[:global, :structure]

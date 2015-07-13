@@ -53,7 +53,7 @@ else
   while true; do
      result=`/usr/bin/curl -L http://${etcd_host}:${etcd_port}/v2/keys/hva/boot -X GET`
      echo "hva/boot result: $result" >> /var/log/wakame-vdc.hva.node.log 2>&1
-     if [[ "go ahead" == "$result=" ]]; then
+     if [[ "$result" == *"go ahead"* ]]; then
         sudo /sbin/start vdc-hva >> /var/log/wakame-vdc.hva.node.log 2>&1
         exit 0
      fi
