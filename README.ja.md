@@ -14,7 +14,7 @@
 
 # 利用者向けドキュメント
 
-[[Wakame-vdc LiveDVD の使い方|wiki/HowtoUseLiveDVD]] を参照してください。
+[Wakame-vdc LiveDVD の使い方](wiki/HowtoUseLiveDVD) を参照してください。
 
 # 開発者向けドキュメント
 
