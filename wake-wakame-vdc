@@ -494,7 +494,7 @@ onerror localboot -1
          end
       end
 
-      def add_hva(node_id, hypervisor: 'kvm')
+      def add_hva(node_id, hypervisor: 'lxc')
          cmd =<<"EOF"
 /opt/axsh/wakame-vdc/dcmgr/bin/vdc-manage host add hva.#{node_id} \
 --uuid hn-#{node_id} --display-name "hva #{node_id}" \
@@ -510,7 +510,7 @@ EOF
          FileUtils.sed_i('/etc/wakame-vdc/hva.conf', src, dst)
       end
 
-      def config_instance_spec(hypervisor: 'kvm')
+      def config_instance_spec(hypervisor: 'lxc')
          specs = {}
          specs[:openvz] =<<"EOF"
 vz.small:
@@ -657,8 +657,8 @@ EOF
                ["Type 2", @messages[:structure_type2], false],
             ]
             @hypervisors = [
-               ["KVM", @messages[:hypervisor_kvm], true],
-               ["LXC", @messages[:hypervisor_lxc], false],
+               ["KVM", @messages[:hypervisor_kvm], false],
+               ["LXC", @messages[:hypervisor_lxc], true],
                ["OpenVZ", @messages[:hypervisor_openvz], false],
             ]
          end
@@ -676,7 +676,8 @@ end
 
 def auto_1box
    @config[:global, :structure] = 'Type 1'
-   @config[:global, :hypervisor] = 'KVM'
+   #@config[:global, :hypervisor] = 'KVM'
+   @config[:global, :hypervisor] = 'LXC'
    result = false
    nic = @network.list_linked_interfaces[0]
    nic = 'eth0' unless nic
@@ -712,7 +713,8 @@ def auto_boxes
    end
    `echo "4" >> #{@constants.progress_status}`
    return auto_1box if 0 == nics.size
-   @config[:global, :hypervisor] = 'KVM'
+   #@config[:global, :hypervisor] = 'KVM'
+   @config[:global, :hypervisor] = 'LXC'
    pp "auto_boxes() dhcp_nics.size: #{dhcp_nics.size}"
    pp "auto_boxes() dhcp_nics: #{dhcp_nics}"
    if 0 < dhcp_nics.size
@@ -794,7 +796,8 @@ def manual_1box
    #@config[:global, :structure] = @dialog.radiolist(@constants.messages[:structure], rows: @constants.structures, escape: true)
    #@config[:global, :hypervisor] = @dialog.radiolist(@constants.messages[:hypervisor], rows: @constants.hypervisors, escape: true)
    @config[:global, :structure] = 'Type 1'
-   @config[:global, :hypervisor] = 'KVM'
+   #@config[:global, :hypervisor] = 'KVM'
+   @config[:global, :hypervisor] = 'LXC'
    @config[:dcmgr, :host_ip] = @dialog.inputbox(@constants.messages[:host_ip], escape: true)
    @config[:dcmgr, :host_nm] = @dialog.inputbox(@constants.messages[:host_nm], escape: true)
    @config[:dcmgr, :host_gw] = @dialog.inputbox(@constants.messages[:host_gw], escape: true)

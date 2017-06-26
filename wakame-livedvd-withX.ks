@@ -12,12 +12,13 @@ firewall --disabled
 #repo --name=base        --baseurl=http://vault.centos.org/6.5/os/$basearch
 #repo --name=updates     --baseurl=http://vault.centos.org/6.5/updates/$basearch
 #repo --name=extras      --baseurl=http://vault.centos.org/6.5/extras/$basearch
-repo --name=base        --baseurl=http://ftp.iij.ad.jp/pub/linux/centos/6.6/os/$basearch
-repo --name=updates     --baseurl=http://ftp.iij.ad.jp/pub/linux/centos/6.6/updates/$basearch
-repo --name=extras      --baseurl=http://ftp.iij.ad.jp/pub/linux/centos/6.6/extras/$basearch
+repo --name=base        --baseurl=http://ftp.iij.ad.jp/pub/linux/centos/6.7/os/$basearch
+repo --name=updates     --baseurl=http://ftp.iij.ad.jp/pub/linux/centos/6.7/updates/$basearch
+repo --name=extras      --baseurl=http://ftp.iij.ad.jp/pub/linux/centos/6.7/extras/$basearch
 repo --name=epel        --baseurl=http://download.fedoraproject.org/pub/epel/6/$basearch
-repo --name=live        --baseurl=http://www.nanotechnologies.qc.ca/propos/linux/centos-live/$basearch/live
-repo --name=wakame      --baseurl=http://dlc.wakame.axsh.jp/packages/rhel/6/master/current/
+#repo --name=live        --baseurl=http://www.nanotechnologies.qc.ca/propos/linux/centos-live/$basearch/live
+#repo --name=wakame      --baseurl=http://dlc.wakame.axsh.jp/packages/rhel/6/master/current/
+repo --name=wakame      --baseurl=http://dlc.wakame.axsh.jp/packages/rhel/6/develop/current/
 repo --name=wakame3rd   --baseurl=http://dlc.wakame.axsh.jp/packages/3rd/rhel/6/master/
 
 ### begin withX
@@ -71,6 +72,11 @@ vim-enhanced
 dialog
 httpd
 zenity
+screen
+patch
+strace
+ltrace
+gdb
 
 -aic94xx-firmware
 -atmel-firmware
@@ -220,13 +226,16 @@ wakame-vdc-hva-kvm-vmapp-config
 wakame-vdc-hva-lxc-vmapp-config
 wakame-vdc-rack-config
 wakame-vdc-webui-vmapp-config
+wakame-vdc-client-mussel
 
 
 %post
 
-cp -a /etc/resolv.conf /etc/resolv.conf.orig
-echo "nameserver 192.168.122.1" >> /etc/resolv.conf
-echo "Wakame-vdc LiveDVD release 15.07 (FINAL)" > /etc/redhat-release
+#cp -a /etc/resolv.conf /etc/resolv.conf.orig
+#echo "nameserver 192.168.122.1" >> /etc/resolv.conf
+echo "nameserver 157.7.180.133" >> /etc/resolv.conf
+echo "nameserver 210.157.3.4" >> /etc/resolv.conf
+echo "Wakame-vdc LiveDVD release 16.1 (FINAL)" > /etc/redhat-release
 
 LIVE_USER="wakame"
 
@@ -268,11 +277,13 @@ EOF_rabbitmq_config
 
 
 ### end withX
+cat /etc/resolv.conf
 
 /opt/axsh/wakame-vdc/ruby/bin/gem install etcd
 /opt/axsh/wakame-vdc/ruby/bin/gem install mixlib-log
 /opt/axsh/wakame-vdc/ruby/bin/gem install rdialog
 /opt/axsh/wakame-vdc/ruby/bin/gem install net-dhcp
+#/opt/axsh/wakame-vdc/ruby/bin/gem install fuguta
 #/opt/axsh/wakame-vdc/ruby/bin/gem install Zenity.rb
 
 EOF_post
@@ -312,9 +323,14 @@ cp -a ./wake-wakame-vdc ${INSTALL_ROOT}/usr/local/bin/
 chmod +x ${INSTALL_ROOT}/usr/local/bin/wake-wakame-vdc
 cp -a ./zenity-progress-conditioner.rb ${INSTALL_ROOT}/usr/local/bin/
 chmod +x ${INSTALL_ROOT}/usr/local/bin/zenity-progress-conditioner.rb
+cp -a ./add_hosts.sh ${INSTALL_ROOT}/usr/local/bin/
+chown root. ${INSTALL_ROOT}/usr/local/bin/add_hosts.sh
+chmod 755 ${INSTALL_ROOT}/usr/local/bin/add_hosts.sh
 
 mkdir -p ${INSTALL_ROOT}/var/lib/wakame-vdc/images
-cp -a ./ubuntu-lucid-kvm-md-32.raw.gz ${INSTALL_ROOT}/var/lib/wakame-vdc/images/
+#cp -a ./centos-6.6.x86_64.lxc.md.raw.gz ${INSTALL_ROOT}/var/lib/wakame-vdc/images/
+#cp -a ./ubuntu-lucid-kvm-md-32.raw.gz ${INSTALL_ROOT}/var/lib/wakame-vdc/images/
+cp -a ./ubuntu-14.04.3-x86_64-30g-passwd-login-enabled.raw.gz ${INSTALL_ROOT}/var/lib/wakame-vdc/images/
 sed -i 's/512\*1024/512\*1024\*4/' ${INSTALL_ROOT}/usr/share/dracut/modules.d/90dmsquash-live/dmsquash-live-root
 
 target=\`ls ${INSTALL_ROOT}/boot/|grep initramfs\`
@@ -326,8 +342,8 @@ for i in \$target; do
    target_count=\$(( \$target_count + 1 ))
 done
 cp splash.jpg ${INSTALL_ROOT}/../iso-*/isolinux/
-sed -i -e "s/ffffffff/ff00cc00/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
-sed -i -e "s/ff000000/ff008800/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
+sed -i -e "s/ffffffff/ff2da94f/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
+sed -i -e "s/ff000000/ff2d654f/" ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg
 cat >> ${INSTALL_ROOT}/../iso-*/isolinux/isolinux.cfg << EOF_isolinux
 label linux0
   menu label Auto_boxes
@@ -349,6 +365,12 @@ cp splash.jpg ${INSTALL_ROOT}/tftpboot/
 cp ${INSTALL_ROOT}/usr/share/syslinux/pxelinux.0 ${INSTALL_ROOT}/tftpboot/
 
 echo "RABBITMQ_NODE_IP_ADDRESS=0.0.0.0" >> ${INSTALL_ROOT}/etc/rabbitmq/rabbitmq-env.conf
+cat >> ${INSTALL_ROOT}/etc/rabbitmq/rabbitmq.config << EOF_rabbitmq_config
+[
+  {rabbit, [{disk_free_limit, 100000000}]}
+].
+EOF_rabbitmq_config
+
 cp etcd ${INSTALL_ROOT}/usr/local/bin/
 cp etcdctl ${INSTALL_ROOT}/usr/local/bin/
 cp stone ${INSTALL_ROOT}/usr/local/bin/
@@ -378,6 +400,7 @@ else
    sudo /sbin/ifconfig eth0 0.0.0.0 up >> /var/log/wakame-vdc.livedvd.log 2>&1 &
    sleep 20
    sudo /usr/local/bin/setup_wakame-vdc.hva.sh >> /var/log/wakame-vdc.livedvd.log 2>&1 &
+   /usr/local/bin/add_hosts.sh
    exit 0
 fi
 if [[ 1 -eq \\\`grep manual_1box /proc/cmdline | wc -l\\\` ]]; then
@@ -389,6 +412,9 @@ elif [[ 1 -eq \\\`grep auto_boxes /proc/cmdline | wc -l\\\` ]]; then
 else
    sudo /usr/local/bin/wake-wakame-vdc auto_1box >> /var/log/wakame-vdc.livedvd.log 2>&1
 fi
+/usr/local/bin/add_hosts.sh
+mkdir -p /lxc/cgroup
+mount -t cgroup lxc /lxc/cgroup
 EOF_rclocal
 
 #cp -a ./gems/gems/* ${INSTALL_ROOT}/opt/axsh/wakame-vdc/ruby/lib/ruby/gems/2.*/gems/
@@ -407,6 +433,7 @@ cp -a ./manual_boxes_launcher ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 chown root. ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/manual_boxes_launcher
 cp -a ./auto_boxes_launcher ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 chown root. ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/auto_boxes_launcher
+#sed -i -e "s|lxc-create -f|lxc-create -t /bin/true -f|" ${INSTALL_ROOT}/opt/axsh/wakame-vdc/dcmgr/lib/dcmgr/drivers/hypervisor/linux_hypervisor/linux_container/lxc.rb
 
 mv ${INSTALL_ROOT}/etc/resolv.conf.orig ${INSTALL_ROOT}/etc/resolv.conf
 
@@ -429,6 +456,18 @@ cp -r ./home/wakame/.config ${INSTALL_ROOT}/home/wakame/
 mkdir -p ${INSTALL_ROOT}/home/wakame/Desktop
 cp ./README.desktop ${INSTALL_ROOT}/home/wakame/Desktop/
 /usr/sbin/chroot ${INSTALL_ROOT}/ chown wakame. -R /home/wakame/Desktop
+#cp ./fix-lxc-driver.patch ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
+cp ./muscle-training.sh ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
+cp ./vifs.json ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
+#cd ${INSTALL_ROOT}/opt/axsh/wakame-vdc/
+#patch -p1 < ./fix-lxc-driver.patch
+#cd -
+#sed -e "s/^-A INPUT .*//" ${INSTALL_ROOT}/etc/sysconfig/iptables
+mv ${INSTALL_ROOT}/opt/axsh/wakame-vdc/dcmgr/vendor ${INSTALL_ROOT}/opt/axsh/wakame-vdc/dcmgr/vendor.orig
+cp -r /mnt/livecd/livedvd/wakame-vdc/dcmgr/vendor ${INSTALL_ROOT}/opt/axsh/wakame-vdc/dcmgr
+cd ${INSTALL_ROOT}/opt/axsh/wakame-vdc/dcmgr
+/usr/sbin/chroot ${INSTALL_ROOT} /opt/axsh/wakame-vdc/ruby/bin/bundle install
+cd -
 
 ### end withX
 

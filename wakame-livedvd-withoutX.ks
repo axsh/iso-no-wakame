@@ -20,6 +20,11 @@ repo --name=live        --baseurl=http://www.nanotechnologies.qc.ca/propos/linux
 repo --name=wakame      --baseurl=http://dlc.wakame.axsh.jp/packages/rhel/6/master/current/
 repo --name=wakame3rd   --baseurl=http://dlc.wakame.axsh.jp/packages/3rd/rhel/6/master/
 
+### begin withX
+xconfig --startxonboot
+part / --size 6144 --fstype ext4
+### end withX
+
 services --disabled=NetworkManager,network,sshd
 
 %pre
@@ -29,8 +34,21 @@ services --disabled=NetworkManager,network,sshd
 @legacy-unix
 @network-tools
 @core
+### begin withX
+@basic-desktop
+@fonts
+@general-desktop
+@graphical-admin-tools
+@input-methods
+@internet-applications
+@internet-browser
+@x11
+@xfce
+firefox
+xkeyboard-config
+### end withX
 #-NetworkManager
--xorg-x11-drv-ati-firmware
+#-xorg-x11-drv-ati-firmware
 subnetcalc
 bash
 kernel
@@ -52,6 +70,117 @@ dnsmasq
 vim-enhanced
 dialog
 httpd
+zenity
+
+-aic94xx-firmware
+-atmel-firmware
+-bfa-firmware
+-ipw2100-firmware
+-ipw2200-firmware
+-ivtv-firmware
+-iwl100-firmware
+-iwl1000-firmware
+-iwl3945-firmware
+-iwl4965-firmware
+-iwl5000-firmware
+-iwl5150-firmware
+-iwl6000-firmware
+-iwl6000g2a-firmware
+-iwl6050-firmware
+-libertas-usb8388-firmware
+-ql2100-firmware
+-ql2200-firmware
+-ql23xx-firmware
+-ql2400-firmware
+-ql2500-firmware
+-rt61pci-firmware
+-rt73usb-firmware
+-xorg-x11-drv-ati-firmware
+-zd1211-firmware
+-ModemManager
+-NetworkManager
+-NetworkManager-glib
+-NetworkManager-gnome
+-cdparanoia
+-cdparanoia-libs
+-cdrdao
+-cups-libs
+-evolution
+-evolution-data-server
+-evolution-help
+-evolution-mapi
+-ghostscript
+-ghostscript-fonts
+-evince
+-evince-dvi
+-evince-libs
+-libspectre
+-glusterfs
+-glusterfs-api
+-glusterfs-libs
+-samba-common
+-samba-winbind
+-samba-winbind-clients
+-samba4-libs
+-abyssinica-fonts
+-cjkuni-fonts
+-cjkuni-uming-fonts
+-dejavu-fonts
+-dejavu-sans-fonts
+-dejavu-sans-mono-fonts
+-dejavu-serif-fonts
+-google-crosextra-caladea-fonts
+-google-crosextra-carlito-fonts
+-jomolhari-fonts
+-khmeros-base-fonts
+-khmeros-fonts
+-kurdit-unikurd-web-fonts
+-liberation-fonts
+-liberation-mono-fonts
+-liberation-sans-fonts
+-liberation-serif-fonts
+-lklug-fonts
+-lohit-assamese-fonts
+-lohit-bengali-fonts
+-lohit-devanagari-fonts
+-lohit-gujarati-fonts
+-lohit-kannada-fonts
+-lohit-oriya-fonts
+-lohit-punjabi-fonts
+-lohit-tamil-fonts
+-lohit-telugu-fonts
+-madan-fonts
+-paktype-fonts
+-paktype-naqsh-fonts
+-paktype-tehreer-fonts
+-sil-padauk-fonts
+-smc-fonts
+-smc-meera-fonts
+-stix-fonts
+-thai-scalable-fonts
+-thai-scalable-waree-fonts
+-tibetan-machine-uni-fonts
+-un-core-dotum-fonts
+-un-core-fonts
+-urw-fonts
+-vlgothic-fonts
+-vlgothic-fonts
+-wqy-zenhei-fonts
+-b43-fwcutter
+-b43-openfwwf
+-bind-libs
+-bind-utils
+-dvd+rw-tools
+-brasero
+-brasero-libs
+-brasero-nautilus
+-rhythmbox
+-sound-juicer
+-ekiga
+-pidgin
+-man
+-man-pages
+-man-pages-overrides
 
 wakame-vdc
 wakame-vdc-dcmgr-vmapp-config
@@ -61,6 +190,7 @@ wakame-vdc-hva-kvm-vmapp-config
 wakame-vdc-hva-lxc-vmapp-config
 wakame-vdc-rack-config
 wakame-vdc-webui-vmapp-config
+
 
 %post
 
@@ -84,11 +214,280 @@ sed -i -e "s/^Defaults    requiretty/#Defaults    requiretty/" /etc/sudoers
 /usr/bin/passwd -d $LIVE_USER > /dev/null
 # give default user sudo privileges
 echo "$LIVE_USER     ALL=(ALL)     NOPASSWD: ALL" >> /etc/sudoers
+### begin withoutX
 /bin/sed -i -e "s|^\(exec /sbin/mingetty \)\(.*\)|\1 --autologin $LIVE_USER \2|" /etc/init/tty.conf
+### end withoutX
+### begin withX
+sed -i -e 's/\[daemon\]/[daemon]\nTimedLoginEnable=true\nTimedLogin=$LIVE_USER\nTimedLoginDelay=10/' /etc/gdm/custom.conf
+# disable screensaver locking
+gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
+sed -i -e "s|^STARTKDE.*|\0\nSTARTXFCE=\"\$(which startxfce4 2>/dev/null)\"/" /etc/X11/xinit/Xclients
+sed -i -e "s|PREFERRED=\"\$STARTKDE.*|\0\n    elif [ \"\$DESKTOP\" = \"XFCE\" ]; then\n\tPREFERRED=\"\$STARTXFCE\"|" /etc/X11/xinit/Xclients
+
+cat > /home/$LIVE_USER/.dmrc << EOF_dmrc
+[Desktop]
+Language=en_US.utf8
+Session=xfce
+EOF_dmrc
+chown $LIVE_USER. /home/$LIVE_USER/.dmrc
+cat /etc/sysconfig/desktop << EOF_sysconfig_desktop
+DESKTOP=XFCE
+DISPLAYMANAGER=GNOME
+EOF_sysconfig_desktop
+
+mkdir -p /home/$LIVE_USER/.config/Terminal
+cat > /home/$LIVE_USER/.config/Terminal/terminalrc << EOF_terminalrc
+[Configuration]
+MiscAlwaysShowTabs=FALSE
+MiscBell=FALSE
+MiscBordersDefault=TRUE
+MiscCursorBlinks=FALSE
+MiscCursorShape=TERMINAL_CURSOR_SHAPE_BLOCK
+MiscDefaultGeometry=80x24
+MiscInheritGeometry=FALSE
+MiscMenubarDefault=TRUE
+MiscMouseAutohide=FALSE
+MiscToolbarsDefault=TRUE
+MiscConfirmClose=TRUE
+MiscCycleTabs=TRUE
+MiscTabCloseButtons=TRUE
+MiscTabCloseMiddleClick=TRUE
+MiscTabPosition=GTK_POS_TOP
+MiscHighlightUrls=TRUE
+FontName=Yutapon coding RegularBackslash 12
+EOF_terminalrc
+
+mkdir -p /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml
+cat > /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml << EOF_xfwm4
+<?xml version="1.0" encoding="UTF-8"?>
+
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="activate_action" type="string" value="bring"/>
+    <property name="borderless_maximize" type="bool" value="true"/>
+    <property name="box_move" type="bool" value="false"/>
+    <property name="box_resize" type="bool" value="false"/>
+    <property name="button_layout" type="string" value="O|SHMC"/>
+    <property name="button_offset" type="int" value="0"/>
+    <property name="button_spacing" type="int" value="0"/>
+    <property name="click_to_focus" type="bool" value="true"/>
+    <property name="focus_delay" type="int" value="250"/>
+    <property name="cycle_apps_only" type="bool" value="false"/>
+    <property name="cycle_draw_frame" type="bool" value="true"/>
+    <property name="cycle_hidden" type="bool" value="true"/>
+    <property name="cycle_minimum" type="bool" value="true"/>
+    <property name="cycle_workspaces" type="bool" value="false"/>
+    <property name="double_click_time" type="int" value="250"/>
+    <property name="double_click_distance" type="int" value="5"/>
+    <property name="double_click_action" type="string" value="maximize"/>
+    <property name="easy_click" type="string" value="Alt"/>
+    <property name="focus_hint" type="bool" value="true"/>
+    <property name="focus_new" type="bool" value="true"/>
+    <property name="frame_opacity" type="int" value="100"/>
+    <property name="full_width_title" type="bool" value="true"/>
+    <property name="inactive_opacity" type="int" value="100"/>
+    <property name="maximized_offset" type="int" value="0"/>
+    <property name="move_opacity" type="int" value="100"/>
+    <property name="placement_ratio" type="int" value="20"/>
+    <property name="placement_mode" type="string" value="center"/>
+    <property name="popup_opacity" type="int" value="100"/>
+    <property name="mousewheel_rollup" type="bool" value="true"/>
+    <property name="prevent_focus_stealing" type="bool" value="false"/>
+    <property name="raise_delay" type="int" value="250"/>
+    <property name="raise_on_click" type="bool" value="true"/>
+    <property name="raise_on_focus" type="bool" value="false"/>
+    <property name="raise_with_any_button" type="bool" value="true"/>
+    <property name="repeat_urgent_blink" type="bool" value="false"/>
+    <property name="resize_opacity" type="int" value="100"/>
+    <property name="restore_on_move" type="bool" value="true"/>
+    <property name="scroll_workspaces" type="bool" value="true"/>
+    <property name="shadow_delta_height" type="int" value="0"/>
+    <property name="shadow_delta_width" type="int" value="0"/>
+    <property name="shadow_delta_x" type="int" value="0"/>
+    <property name="shadow_delta_y" type="int" value="-3"/>
+    <property name="shadow_opacity" type="int" value="50"/>
+    <property name="show_app_icon" type="bool" value="false"/>
+    <property name="show_dock_shadow" type="bool" value="true"/>
+    <property name="show_frame_shadow" type="bool" value="false"/>
+    <property name="show_popup_shadow" type="bool" value="false"/>
+    <property name="snap_resist" type="bool" value="false"/>
+    <property name="snap_to_border" type="bool" value="true"/>
+    <property name="snap_to_windows" type="bool" value="false"/>
+    <property name="snap_width" type="int" value="10"/>
+    <property name="theme" type="string" value="Agua"/>
+    <property name="tile_on_move" type="bool" value="true"/>
+    <property name="title_alignment" type="string" value="center"/>
+    <property name="title_font" type="string" value="Yutapon coding RegularBackslash 9"/>
+    <property name="title_horizontal_offset" type="int" value="0"/>
+    <property name="title_shadow_active" type="string" value="false"/>
+    <property name="title_shadow_inactive" type="string" value="false"/>
+    <property name="title_vertical_offset_active" type="int" value="0"/>
+    <property name="title_vertical_offset_inactive" type="int" value="0"/>
+    <property name="toggle_workspaces" type="bool" value="false"/>
+    <property name="unredirect_overlays" type="bool" value="true"/>
+    <property name="urgent_blink" type="bool" value="false"/>
+    <property name="use_compositing" type="bool" value="false"/>
+    <property name="workspace_count" type="int" value="4"/>
+    <property name="wrap_cycle" type="bool" value="true"/>
+    <property name="workspace_names" type="array">
+      <value type="string" value="Workspace 1"/>
+      <value type="string" value="Workspace 2"/>
+      <value type="string" value="Workspace 3"/>
+      <value type="string" value="Workspace 4"/>
+    </property>
+    <property name="wrap_layout" type="bool" value="true"/>
+    <property name="wrap_resistance" type="int" value="10"/>
+    <property name="wrap_windows" type="bool" value="true"/>
+    <property name="wrap_workspaces" type="bool" value="false"/>
+  </property>
+</channel>
+EOF_xfwm4
+
+cat > /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml << EOF_xsettings
+<?xml version="1.0" encoding="UTF-8"?>
+
+<channel name="xsettings" version="1.0">
+  <property name="Net" type="empty">
+    <property name="ThemeName" type="string" value="MacOS-X"/>
+    <property name="IconThemeName" type="Gant.Xfce"/>
+    <property name="DoubleClickTime" type="int" value="250"/>
+    <property name="DoubleClickDistance" type="int" value="5"/>
+    <property name="DndDragThreshold" type="int" value="8"/>
+    <property name="CursorBlink" type="bool" value="true"/>
+    <property name="CursorBlinkTime" type="int" value="1200"/>
+    <property name="SoundThemeName" type="string" value="default"/>
+    <property name="EnableEventSounds" type="bool" value="false"/>
+    <property name="EnableInputFeedbackSounds" type="bool" value="false"/>
+  </property>
+  <property name="Xft" type="empty">
+    <property name="DPI" type="empty"/>
+    <property name="Antialias" type="int" value="-1"/>
+    <property name="Hinting" type="int" value="-1"/>
+    <property name="HintStyle" type="string" value="hintnone"/>
+    <property name="RGBA" type="string" value="none"/>
+  </property>
+  <property name="Gtk" type="empty">
+    <property name="CanChangeAccels" type="bool" value="false"/>
+    <property name="ColorPalette" type="string" value="black:white:gray50:red:purple:blue:light blue:green:yellow:orange:lavender:brown:goldenrod4:dodger blue:pink:light green:gray10:gray30:gray75:gray90"/>
+    <property name="FontName" type="string" value="Yutapon coding Heavy Sl 10"/>
+    <property name="IconSizes" type="string" value=""/>
+    <property name="KeyThemeName" type="string" value=""/>
+    <property name="ToolbarStyle" type="string" value="icons"/>
+    <property name="ToolbarIconSize" type="int" value="3"/>
+    <property name="IMPreeditStyle" type="string" value=""/>
+    <property name="IMStatusStyle" type="string" value=""/>
+    <property name="MenuImages" type="bool" value="true"/>
+    <property name="ButtonImages" type="bool" value="true"/>
+    <property name="MenuBarAccel" type="string" value="F10"/>
+    <property name="CursorThemeName" type="string" value=""/>
+    <property name="CursorThemeSize" type="int" value="0"/>
+    <property name="IMModule" type="string" value=""/>
+  </property>
+</channel>
+EOF_xsettings
+
+cat > /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml << EOF_xfce4panel
+<?xml version="1.0" encoding="UTF-8"?>
+
+<channel name="xfce4-panel" version="1.0">
+  <property name="panels" type="uint" value="2">
+    <property name="panel-0" type="empty">
+      <property name="position" type="string" value="p=6;x=0;y=0"/>
+      <property name="length" type="uint" value="100"/>
+      <property name="position-locked" type="bool" value="true"/>
+      <property name="plugin-ids" type="array">
+        <value type="int" value="1"/>
+        <value type="int" value="2"/>
+        <value type="int" value="3"/>
+        <value type="int" value="4"/>
+        <value type="int" value="5"/>
+        <value type="int" value="6"/>
+        <value type="int" value="15"/>
+      </property>
+    </property>
+    <property name="panel-1" type="empty">
+      <property name="position" type="string" value="p=10;x=0;y=0"/>
+      <property name="size" type="uint" value="40"/>
+      <property name="position-locked" type="bool" value="true"/>
+      <property name="plugin-ids" type="array">
+        <value type="int" value="7"/>
+        <value type="int" value="8"/>
+        <value type="int" value="9"/>
+        <value type="int" value="10"/>
+        <value type="int" value="11"/>
+        <value type="int" value="12"/>
+        <value type="int" value="13"/>
+        <value type="int" value="14"/>
+      </property>
+    </property>
+  </property>
+  <property name="plugins" type="empty">
+    <property name="plugin-1" type="string" value="applicationsmenu"/>
+    <property name="plugin-2" type="string" value="actions"/>
+    <property name="plugin-3" type="string" value="tasklist"/>
+    <property name="plugin-4" type="string" value="pager"/>
+    <property name="plugin-5" type="string" value="clock"/>
+    <property name="plugin-6" type="string" value="systray">
+      <property name="names-visible" type="array">
+        <value type="string" value="gnome-power-manager"/>
+        <value type="string" value="networkmanager applet"/>
+        <value type="string" value="gnome-volume-control-applet"/>
+      </property>
+    </property>
+    <property name="plugin-15" type="string" value="xfce4-mixer-plugin"/>
+    <property name="plugin-7" type="string" value="showdesktop"/>
+    <property name="plugin-8" type="string" value="separator">
+      <property name="style" type="uint" value="1"/>
+    </property>
+    <property name="plugin-9" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="14245876745.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-10" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="14245876746.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-11" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="14245876747.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-12" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="14245876758.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-13" type="string" value="separator">
+      <property name="style" type="uint" value="1"/>
+    </property>
+    <property name="plugin-14" type="string" value="directorymenu">
+      <property name="base-directory" type="string" value="/home/wakame"/>
+    </property>
+  </property>
+</channel>
+EOF_xfce4panel
+rm -f /home/$LIVE_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
+chown ${LIVE_USER}. -R /home/$LIVE_USER/.config
+mkdir -p /home/$LIVE_USER/Desktop
+cat > /home/$LIVE_USER/Desktop/Wakame-VDC.WebUI.desktop << EOF_webuiurl
+[Desktop Entry]
+Version=1.0
+Type=Link
+Name=Wakame-VDC WebUI
+Comment=
+Icon=gnome-fs-bookmark
+URL=http://127.0.0.1:9000
+EOF_webuiurl
+chown ${LIVE_USER}. -R /home/$LIVE_USER/Desktop
+
+### end withX
 
 /opt/axsh/wakame-vdc/ruby/bin/gem install etcd
 /opt/axsh/wakame-vdc/ruby/bin/gem install mixlib-log
 /opt/axsh/wakame-vdc/ruby/bin/gem install rdialog
+/opt/axsh/wakame-vdc/ruby/bin/gem install Zenity.rb
 
 EOF_post
 
@@ -157,8 +556,34 @@ cp -a ./pub.pem ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/
 chmod 400 ${INSTALL_ROOT}/opt/axsh/wakame-vdc/demo.data/pub.pem
 
 mv ${INSTALL_ROOT}/etc/resolv.conf.orig ${INSTALL_ROOT}/etc/resolv.conf
+
+### begin withX
+cp -r ./fonts/yutapon_coding ${INSTALL_ROOT}/usr/share/fonts/
+cp -r ./fonts/yutaCo2 ${INSTALL_ROOT}/usr/share/fonts/
+
+cp -r ./MacOS-X ${INSTALL_ROOT}/usr/share/themes/
+
+### end withX
+
+rm -rf ${INSTALL_ROOT}/usr/share/{doc,man,info}
+
 EOF_postnochroot
 
 /bin/bash -x /root/postnochroot-install 2>&1 | tee /root/postnochroot-install.log
 
+#for i in `find ${INSTALL_ROOT}/bin/ ${INSTALL_ROOT}/usr/ ${INSTALL_ROOT}/opt/ -type f`; do
+#A=`file $i | cut -d':' -f2 | grep archive`
+#if [[ ! -z $A ]]; then
+#  strip -S $i
+#fi
+#B=`file $i | cut -d':' -f2 | grep "not stripped"`
+#if [[ ! -z $B ]]; then
+#  C=`echo $i | grep lib`
+#  if [[ ! -z $C ]]; then
+#    strip -S $i
+#  else
+#    strip $i
+#  fi
+#fi
+#done
 

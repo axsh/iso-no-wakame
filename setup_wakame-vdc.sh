@@ -116,22 +116,51 @@ grep -v '\s*#' <<CMDSET | /opt/axsh/wakame-vdc/dcmgr/bin/vdc-manage -e
     --description "apache based webdav storage"
 
   # Add the image's backup object (hard drive image)
+  #backupobject add \
+  #  --uuid bo-lucid5d \
+  #  --display-name "Ubuntu 10.04 (Lucid Lynx) root partition" \
+  #  --storage-id bkst-demo1 \
+  #  --object-key ubuntu-lucid-kvm-md-32.raw.gz \
+  #  --size 149084 \
+  #  --allocation-size 359940 \
+  #  --container-format gz \
+  #  --checksum 1f841b195e0fdfd4342709f77325ce29
+  #backupobject add \
+  #  --uuid bo-centos66 \
+  #  --display-name "CentOS 6.6 x86_64 root partition" \
+  #  --storage-id bkst-demo1 \
+  #  --object-key centos-6.6.x86_64.lxc.md.raw.gz \
+  #  --size 321491 \
+  #  --allocation-size 4194304 \
+  #  --container-format gz \
+  #  --checksum 5524d3b87aa0a9eeb3aaf348f671a631
   backupobject add \
-    --uuid bo-lucid5d \
-    --display-name "Ubuntu 10.04 (Lucid Lynx) root partition" \
+    --uuid bo-ubuntu14043ple \
+    --display-name "ubuntu 14.04.3 passwd login enabled" \
     --storage-id bkst-demo1 \
-    --object-key ubuntu-lucid-kvm-md-32.raw.gz \
-    --size 149084 \
-    --allocation-size 359940 \
+    --object-key ubuntu-14.04.3-x86_64-30g-passwd-login-enabled.raw.gz \
+    --size 31458328576 \
+    --allocation-size 345028134 \
     --container-format gz \
-    --checksum 1f841b195e0fdfd4342709f77325ce29
+    --checksum 9d73b0b461bdc9477ebb0691991ee101
 
   # Tell Wakame-vdc that this backup object is a bootable machine image
-  image add local bo-lucid5d \
+  # image add local bo-lucid5d \
+  #   --account-id a-shpoolxx \
+  #   --uuid wmi-lucid5d \
+  #   --root-device uuid:148bc5df-3fc5-4e93-8a16-7328907cb1c0 \
+  #   --display-name "Ubuntu 10.04 (Lucid Lynx)"
+  # Tell Wakame-vdc that this backup object is a bootable machine image
+  #image add local bo-centos66 \
+  #  --account-id a-shpoolxx \
+  #  --uuid wmi-centos66 \
+  #  --root-device uuid:eb69a6cf-fc3f-42cd-9b21-c70ad78f6d9e \
+  #  --display-name "CentOS 6.6 x86_64"
+  image add local bo-ubuntu14043ple \
     --account-id a-shpoolxx \
-    --uuid wmi-lucid5d \
-    --root-device uuid:148bc5df-3fc5-4e93-8a16-7328907cb1c0 \
-    --display-name "Ubuntu 10.04 (Lucid Lynx)"
+    --uuid wmi-ubuntu14043ple \
+    --root-device label:root \
+    --display-name "ubuntu 14.04.3 passwd login enabled"
 
   # Give Wakame-vdc a network to start instances in
   network add \
